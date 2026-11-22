@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Algo Studio — Interactive Machine Learning Visualizer</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/education.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" crossorigin="anonymous">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">ML</div>
+      <div>
+        <div class="brand-title">ML Algo Studio</div>
+        <div class="brand-sub">Interactive 2D Machine Learning Explorer</div>
+      </div>
+    </div>
+
+    <div class="topbar-controls">
+      <label class="inline-field" for="algoSelect">
+        <span class="field-caption">Algorithm</span>
+        <select id="algoSelect" aria-label="Primary algorithm"></select>
+      </label>
+
+      <button class="btn btn-sm" id="duelToggleBtn" type="button" aria-pressed="false">
+        Duel Mode: Off
+      </button>
+
+      <label class="inline-field hidden" id="duelSelectWrap" for="duelAlgoSelect">
+        <span class="field-caption">vs.</span>
+        <select id="duelAlgoSelect" aria-label="Challenger algorithm"></select>
+      </label>
+
+      <button class="btn btn-sm" id="reseedBtn" type="button" title="Generate new deterministic random seed">
+        Reseed (<span id="seedBadge">42</span>)
+      </button>
+
+      <button class="btn btn-sm" id="shareBtn" type="button">
+        Copy Link
+      </button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="stage" aria-label="Algorithm visualization">
+      <div class="intuition-bar">
+        <div class="intuition-head">
+          <h1 class="algo-heading" id="algoTitle">Neural Network (MLP)</h1>
+          <span class="algo-tag" id="algoBadge">Classification</span>
+        </div>
+        <p class="algo-intuition" id="algoIntuition"></p>
+      </div>
+
+      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Canvas and training controls"></div>
+
+      <div class="canvases-row" id="canvasesRow">
+        <div class="canvas-card" id="primaryCard">
+          <div class="canvas-card-header hidden" id="primaryDuelHeader">
+            <span class="duel-label" id="primaryDuelName">Primary</span>
+            <span class="duel-metric" id="primaryDuelStat"></span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="mlCanvas" aria-label="Primary algorithm 2D data and decision boundary canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="canvas-card hidden" id="duelCard">
+          <div class="canvas-card-header">
+            <span class="duel-label" id="duelAlgoName">Challenger</span>
+            <span class="duel-metric" id="duelAlgoStat"></span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="duelCanvas" aria-label="Challenger algorithm 2D data and decision boundary canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="canvas-footer">
+        <span>Click canvas to add or test points · Right-click to erase nearest point · Range [-5, 5]</span>
+        <span class="coord-readout" id="coordReadout">x: 0.00, y: 0.00</span>
+      </div>
+
+      <div class="probe-banner hidden" id="probeBanner" role="status" aria-live="polite"></div>
+
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <div class="curve-card hidden" id="curveCard">
+        <div class="card-header-row">
+          <h2 class="section-label" id="curveTitle">Training Loss Over Steps</h2>
+          <span class="curve-legend" id="curveLegend"></span>
+        </div>
+        <div class="curve-stage" id="curveStage"></div>
+      </div>
+
+      <div class="notice-card">
+        <div class="notice-title">What to notice</div>
+        <p class="notice-body" id="whatToNotice"></p>
+      </div>
+
+      <div class="internals-card hidden" id="internalsCard">
+        <div class="card-header-row">
+          <h2 class="section-label" id="internalsTitle">Model Internals</h2>
+          <div class="sub-tabs" id="internalsTabs"></div>
+        </div>
+        <div class="svg-stage" id="internalsStage"></div>
+      </div>
+    </section>
+
+    <aside class="controls-rail" aria-label="Parameters and dataset controls">
+      <div class="panel-card">
+        <h2 class="section-label">Parameters &amp; Dataset</h2>
+        <div id="controlsBox"></div>
+      </div>
+
+      <details class="panel-card data-drawer">
+        <summary class="drawer-summary">
+          <span class="section-label">Data Points &amp; CSV</span>
+          <span class="coord-readout" id="dataCount">0 pts</span>
+        </summary>
+        <div class="drawer-body">
+          <div class="input-inline-3">
+            <input type="number" id="inputX" step="0.1" min="-5" max="5" aria-label="Point X coordinate" value="1.5">
+            <input type="number" id="inputY" step="0.1" min="-5" max="5" aria-label="Point Y coordinate" value="2.0">
+            <div id="inputLabelWrap">
+              <input type="number" id="inputLabel" step="1" min="0" max="2" aria-label="Point class label" value="0">
+            </div>
+            <button class="btn btn-primary btn-sm" id="addPointBtn" type="button">Add</button>
+          </div>
+
+          <div class="control-row">
+            <label class="control-label" for="csvInput"><span>Bulk CSV (x, y, label)</span></label>
+            <textarea id="csvInput" placeholder="-2.1, -1.4, 0&#10;1.8, 2.2, 1"></textarea>
+            <div class="toolbar-group">
+              <button class="btn btn-sm btn-primary" id="importCsvBtn" type="button">Load CSV</button>
+              <button class="btn btn-sm" id="exportCsvBtn" type="button">Export CSV</button>
+            </div>
+          </div>
+
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>X</th><th>Y</th><th>Class</th><th></th></tr>
+              </thead>
+              <tbody id="dataTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    </aside>
+  </main>
+
+  <section class="education-section" id="educationSection" aria-label="Algorithm Theory &amp; Reference Guide"></section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js" crossorigin="anonymous"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/education.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
