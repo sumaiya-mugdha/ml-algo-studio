@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ML Algo Studio — Interactive Machine Learning Visualizer</title>
+  <title>ML Algo Studio</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/education.css">
   <link rel="stylesheet" href="css/portal.css">
@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" crossorigin="anonymous">
 </head>
 <body>
-  <!-- Sticky Global Site Header -->
   <header class="site-header">
     <div class="site-header-inner">
       <a href="#home" class="site-brand" data-nav-view="home">
@@ -38,7 +37,7 @@
           <span class="kbd-hint">Ctrl+K</span>
         </button>
 
-        <button type="button" class="mode-btn" id="surfaceToggleBtn" aria-pressed="false" title="Toggle Soft shadows &amp; blur vs. Strict Flat design">
+        <button type="button" class="mode-btn" id="surfaceToggleBtn" aria-pressed="false" title="Switch Soft vs. Flat surface">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="3" width="14" height="14" rx="2"></rect>
             <path d="M7 21h12a2 2 0 0 0 2-2V7"></path>
@@ -46,15 +45,15 @@
           <span class="mode-btn-text">Soft</span>
         </button>
 
-        <button type="button" class="mode-btn" id="themeToggleBtn" aria-pressed="false" title="Toggle Light or Dark theme">
+        <button type="button" class="mode-btn" id="themeToggleBtn" aria-pressed="false" title="Switch Light vs. Dark theme">
           <svg class="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
           </svg>
           <span class="mode-btn-text">Light</span>
         </button>
 
-        <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu" aria-expanded="false">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 6h16M4 12h16M4 18h16"></path>
           </svg>
         </button>
@@ -71,17 +70,18 @@
     </nav>
   </header>
 
-  <!-- VIEW 1: HOME -->
   <section id="view-home" class="portal-view">
     <div class="portal-container" id="homeRoot"></div>
   </section>
 
-  <!-- VIEW 2: VISUALIZATIONS GALLERY -->
   <section id="view-visualizations" class="portal-view hidden">
     <div class="portal-container" id="galleryRoot"></div>
   </section>
 
-  <!-- VIEW 3: INTERACTIVE STUDIO -->
+  <section id="view-lab" class="portal-view hidden">
+    <div class="portal-container" id="labRoot"></div>
+  </section>
+
   <div id="view-studio" class="portal-view hidden">
     <div class="studio-subbar">
       <div class="studio-subbar-inner">
@@ -108,7 +108,7 @@
             <select id="duelAlgoSelect" aria-label="Challenger algorithm"></select>
           </label>
 
-          <button class="btn btn-sm" id="reseedBtn" type="button" title="Generate new deterministic random seed">
+          <button class="btn btn-sm" id="reseedBtn" type="button" title="New random seed">
             Reseed (<span id="seedBadge">42</span>)
           </button>
 
@@ -156,7 +156,7 @@
         </div>
 
         <div class="canvas-footer">
-          <span id="canvasHintText">Drag the ringed query point · Click to add points · Right-click to erase</span>
+          <span id="canvasHintText">Drag query point · Click to add · Right-click to erase</span>
           <span class="coord-readout" id="coordReadout">x: 0.00, y: 0.00</span>
         </div>
 
@@ -203,7 +203,7 @@
         <div class="panel-card break-card">
           <div class="card-header-row compact-row">
             <h2 class="section-label">Break It</h2>
-            <button class="btn btn-sm" id="resetDefaultsBtn" type="button">Reset Defaults</button>
+            <button class="btn btn-sm" id="resetDefaultsBtn" type="button">Reset</button>
           </div>
           <div class="break-it-list" id="breakItBox"></div>
         </div>
@@ -250,71 +250,34 @@
     <section class="education-section" id="educationSection" aria-label="Algorithm Theory &amp; Reference Guide"></section>
   </div>
 
-  <!-- VIEW 4: LEARNING PATH -->
   <section id="view-path" class="portal-view hidden">
     <div class="portal-container" id="pathRoot"></div>
   </section>
 
-  <!-- VIEW 5: GLOSSARY -->
   <section id="view-glossary" class="portal-view hidden">
     <div class="portal-container" id="glossaryRoot"></div>
   </section>
 
-  <!-- VIEW 6: ABOUT -->
   <section id="view-about" class="portal-view hidden">
     <div class="portal-container" id="aboutRoot"></div>
   </section>
 
-  <!-- Global Footer -->
   <footer class="site-footer" id="siteFooter">
     <div class="site-footer-inner">
-      <div class="footer-brand-col">
-        <a href="#home" class="site-brand" data-nav-view="home">
-          <div class="brand-mark" aria-hidden="true">ML</div>
-          <span class="brand-title">ML Algo Studio</span>
-        </a>
-        <p class="footer-desc">
-          Learn machine learning through real 2D math in your browser. Explore 11 live interactive algorithms, test failure modes on purpose, and follow a guided curriculum.
-        </p>
-      </div>
-
-      <div class="footer-links-grid">
-        <div class="footer-col">
-          <h4>Explore</h4>
-          <ul>
-            <li><a href="#home" data-nav-view="home">Home</a></li>
-            <li><a href="#visualizations" data-nav-view="visualizations">All Visualizations</a></li>
-            <li><a href="#studio" data-nav-view="studio">Interactive Studio</a></li>
-            <li><a href="#path" data-nav-view="path">Learning Path</a></li>
-            <li><a href="#glossary" data-nav-view="glossary">Glossary</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Categories</h4>
-          <ul>
-            <li><a href="#visualizations" data-footer-category="Regression">Regression</a></li>
-            <li><a href="#visualizations" data-footer-category="Classification">Classification</a></li>
-            <li><a href="#visualizations" data-footer-category="Ensembles">Ensembles</a></li>
-            <li><a href="#visualizations" data-footer-category="Unsupervised">Unsupervised</a></li>
-            <li><a href="#visualizations" data-footer-category="Neural Networks">Neural Networks</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Project</h4>
-          <ul>
-            <li><a href="#about" data-nav-view="about">About the Project</a></li>
-            <li><a href="#studio" data-nav-view="studio">Duel Mode</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-    <div class="site-footer-bottom">
-      <span>ML Algo Studio · Zero build step · 100% client-side math</span>
-      <span>Toggle Light/Dark theme &amp; Soft/Flat surface mode anytime in the header.</span>
+      <a href="#home" class="site-brand" data-nav-view="home">
+        <div class="brand-mark" aria-hidden="true">ML</div>
+        <span class="brand-title">ML Algo Studio</span>
+      </a>
+      <nav class="footer-links-inline" aria-label="Footer navigation">
+        <a href="#visualizations" data-nav-view="visualizations">Visualizations</a>
+        <a href="#studio" data-nav-view="studio">Studio</a>
+        <a href="#path" data-nav-view="path">Learning Path</a>
+        <a href="#glossary" data-nav-view="glossary">Glossary</a>
+        <a href="#about" data-nav-view="about">About</a>
+      </nav>
     </div>
   </footer>
 
-  <!-- Global Search Modal -->
   <div class="search-modal-overlay hidden" id="searchModal" role="dialog" aria-modal="true" aria-label="Search algorithms">
     <div class="search-modal">
       <div class="search-modal-head">
@@ -322,7 +285,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.34-4.34"></path>
         </svg>
-        <input type="search" id="searchModalInput" class="search-modal-input" placeholder="Search 31 algorithms, concepts, or categories (e.g. SVM, Gini, PCA)..." autocomplete="off">
+        <input type="search" id="searchModalInput" class="search-modal-input" placeholder="Search 31 algorithms or concepts..." autocomplete="off">
         <button type="button" class="search-modal-close" id="closeSearchBtn">Esc</button>
       </div>
       <div class="search-modal-body" id="searchModalResults"></div>
@@ -339,6 +302,9 @@
   <script src="js/education.js"></script>
   <script src="js/catalog.js"></script>
   <script src="js/thumbnails.js"></script>
+  <script src="js/labs_foundations.js"></script>
+  <script src="js/labs_advanced.js"></script>
+  <script src="js/labs.js"></script>
   <script src="js/app.js"></script>
   <script src="js/portal.js"></script>
   <script src="js/home.js"></script>

@@ -1,17 +1,13 @@
 /* ============================================================================
-   ML Algo Studio — Learning Path, Searchable Glossary & About Page (Batch 5)
+   ML Algo Studio — Learning Path, A-Z Editorial Glossary & About Page
    ============================================================================ */
 
 (function () {
   function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  /* ---- 1. Curated Learning Path ---- */
+  /* ---- 1. Learning Path (All 31 Live) ---- */
   function renderLearningPath() {
     const root = document.getElementById('pathRoot');
     if (!root || !window.MLCatalog) return;
@@ -21,24 +17,13 @@
         .map((id) => {
           const algo = window.MLCatalog.getById(id);
           if (!algo) return '';
-          if (algo.live && algo.studioId) {
-            return `
-              <button type="button" class="path-item-btn live" data-launch-studio="${escapeHtml(algo.studioId)}">
-                <div class="path-item-main">
-                  <span class="path-item-title">${escapeHtml(algo.title)}</span>
-                  <span class="path-item-meta">${escapeHtml(algo.difficulty)} &middot; ${escapeHtml(algo.timeEstimate)}</span>
-                </div>
-                <span class="pill-badge pill-live">Launch &rarr;</span>
-              </button>
-            `;
-          }
           return `
-            <button type="button" class="path-item-btn soon" data-jump-gallery="${escapeHtml(algo.category)}">
+            <button type="button" class="path-item-btn live" data-open-algo="${escapeHtml(algo.id)}">
               <div class="path-item-main">
                 <span class="path-item-title">${escapeHtml(algo.title)}</span>
-                <span class="path-item-meta">${escapeHtml(algo.difficulty)} &middot; ${escapeHtml(algo.timeEstimate)}</span>
+                <span class="path-item-meta">${escapeHtml(algo.difficulty)}</span>
               </div>
-              <span class="pill-badge pill-soon">Coming Soon</span>
+              <span class="viz-card-cta">&rarr;</span>
             </button>
           `;
         })
@@ -60,96 +45,147 @@
 
     root.innerHTML = `
       <div class="narrow-container">
+        <div class="studio-breadcrumb" style="margin-bottom:14px;">
+          <a href="#home" data-nav-view="home">Home</a>
+          <span aria-hidden="true">/</span>
+          <strong>Learning Path</strong>
+        </div>
         <div class="page-header-block">
-          <h1 class="page-title">Curated Learning Path</h1>
-          <p class="page-sub">
-            Follow this 5-stage sequence from linear lines to neural networks. Click any <strong>Live</strong> item to launch it directly in the interactive Studio.
-          </p>
+          <h1 class="page-title">Learning path</h1>
+          <p class="page-sub">Five sequential stages from basic function fitting to neural networks and attention.</p>
         </div>
         <div class="path-timeline">${stagesHtml}</div>
       </div>
     `;
 
-    root.querySelectorAll('[data-launch-studio]').forEach((btn) => {
-      btn.addEventListener('click', () => window.MLPortal.openStudio(btn.getAttribute('data-launch-studio')));
+    root.querySelectorAll('[data-nav-view]').forEach((a) => {
+      a.addEventListener('click', (e) => { e.preventDefault(); window.MLPortal.setView(a.getAttribute('data-nav-view')); });
     });
-    root.querySelectorAll('[data-jump-gallery]').forEach((btn) => {
-      btn.addEventListener('click', () => window.MLPortal.openGalleryWithFilter(btn.getAttribute('data-jump-gallery')));
+    root.querySelectorAll('[data-open-algo]').forEach((btn) => {
+      btn.addEventListener('click', () => window.MLPortal.openAlgorithm(btn.getAttribute('data-open-algo')));
     });
   }
 
-  /* ---- 2. Searchable Glossary ---- */
+  /* ---- 2. Editorial A-Z Glossary ---- */
   function renderGlossary() {
     const root = document.getElementById('glossaryRoot');
     if (!root || !window.MLCatalog) return;
 
+    const allEntries = [...window.MLCatalog.GLOSSARY].sort((a, b) => a.term.localeCompare(b.term));
+    const letters = [...new Set(allEntries.map((e) => e.term[0].toUpperCase()))];
+
     root.innerHTML = `
       <div class="narrow-container">
-        <div class="page-header-block">
-          <h1 class="page-title">Machine Learning Glossary</h1>
-          <p class="page-sub">
-            Plain-English definitions for core ML terms. Every entry links straight to a live interactive algorithm where you can see the concept in action.
+        <div class="studio-breadcrumb" style="margin-bottom:14px;">
+          <a href="#home" data-nav-view="home">Home</a>
+          <span aria-hidden="true">/</span>
+          <strong>Glossary</strong>
+        </div>
+
+        <header class="glossary-header">
+          <h1 class="page-title">Machine learning glossary</h1>
+          <p class="glossary-intro">
+            Every term below is defined in plain language — and unlike a normal glossary, each one links to an interactive visualization where you can see the idea run on real numbers, drag the data around, and break the algorithm on purpose. If a definition feels abstract, click through and play with it: the concept usually clicks in under a minute.
           </p>
+          <p class="glossary-intro">
+            Definitions are ordered A&ndash;Z. Under each entry, the &ldquo;Covers&rdquo; line lists the specific skills that concept&rsquo;s page teaches, so you can jump straight to the visualization that explains the exact thing you&rsquo;re stuck on.
+          </p>
+        </header>
+
+        <div class="glossary-toolbar">
+          <nav class="alpha-bar" aria-label="Jump to letter">
+            ${letters.map((L) => `<button type="button" class="alpha-btn" data-alpha="${L}">${L}</button>`).join('')}
+          </nav>
+          <div class="gallery-search-wrap glossary-filter-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.34-4.34"></path>
+            </svg>
+            <input type="search" id="glossarySearchInput" class="gallery-search-input" placeholder="Filter terms or skills...">
+          </div>
         </div>
 
-        <div class="gallery-search-wrap" style="margin-bottom:20px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.34-4.34"></path>
-          </svg>
-          <input type="search" id="glossarySearchInput" class="gallery-search-input" placeholder="Filter glossary terms (e.g. sigmoid, Gini, inertia, eigenvector)...">
-        </div>
-
-        <div class="glossary-list" id="glossaryList"></div>
+        <div class="glossary-az-list" id="glossaryList"></div>
       </div>
     `;
 
-    const input = document.getElementById('glossarySearchInput');
-    const renderItems = (query) => {
+    root.querySelectorAll('[data-nav-view]').forEach((a) => {
+      a.addEventListener('click', (e) => { e.preventDefault(); window.MLPortal.setView(a.getAttribute('data-nav-view')); });
+    });
+
+    const renderList = (query) => {
       const listEl = document.getElementById('glossaryList');
       if (!listEl) return;
       const q = (query || '').trim().toLowerCase();
-      const matches = window.MLCatalog.GLOSSARY.filter(
+      const filtered = allEntries.filter(
         (g) =>
           !q ||
           g.term.toLowerCase().includes(q) ||
           g.definition.toLowerCase().includes(q) ||
-          g.category.toLowerCase().includes(q)
+          (g.covers || []).some((c) => c.toLowerCase().includes(q))
       );
 
-      if (!matches.length) {
-        listEl.innerHTML = `<div class="portal-card" style="text-align:center;color:var(--text-muted);">No glossary terms match "${escapeHtml(query)}".</div>`;
+      if (!filtered.length) {
+        listEl.innerHTML = `<p class="glossary-empty">No terms match &ldquo;${escapeHtml(query)}&rdquo;.</p>`;
         return;
       }
 
-      listEl.innerHTML = matches
-        .map(
-          (item) => `
-            <article class="glossary-card portal-card">
-              <div class="glossary-card-head">
-                <div>
-                  <span class="pill-badge" style="margin-bottom:6px;">${escapeHtml(item.category)}</span>
-                  <h2 class="glossary-term">${escapeHtml(item.term)}</h2>
-                </div>
-                <button type="button" class="btn btn-sm btn-primary" data-launch-studio="${escapeHtml(item.studioId)}">
-                  Try in Studio &rarr;
-                </button>
-              </div>
-              <p class="glossary-def">${escapeHtml(item.definition)}</p>
-            </article>
-          `
-        )
-        .join('');
+      const grouped = new Map();
+      for (const entry of filtered) {
+        const letter = entry.term[0].toUpperCase();
+        if (!grouped.has(letter)) grouped.set(letter, []);
+        grouped.get(letter).push(entry);
+      }
 
-      listEl.querySelectorAll('[data-launch-studio]').forEach((btn) => {
-        btn.addEventListener('click', () => window.MLPortal.openStudio(btn.getAttribute('data-launch-studio')));
+      let html = '';
+      for (const [letter, items] of grouped.entries()) {
+        html += `
+          <section class="glossary-letter-group" id="glossary-letter-${letter}">
+            <h2 class="glossary-letter-heading">${letter}</h2>
+            <div class="glossary-entries">
+              ${items
+                .map(
+                  (item) => `
+                    <article class="glossary-entry">
+                      <h3 class="glossary-entry-term">${escapeHtml(item.term)}</h3>
+                      <p class="glossary-entry-def">${escapeHtml(item.definition)}</p>
+                      <div class="glossary-entry-covers">
+                        <span>Covers:</span> ${(item.covers || []).map(escapeHtml).join(' &middot; ')}
+                      </div>
+                      <button type="button" class="glossary-entry-link" data-open-algo="${escapeHtml(item.targetId)}">
+                        Explore the interactive &rarr;
+                      </button>
+                    </article>
+                  `
+                )
+                .join('')}
+            </div>
+          </section>
+        `;
+      }
+
+      listEl.innerHTML = html;
+      listEl.querySelectorAll('[data-open-algo]').forEach((btn) => {
+        btn.addEventListener('click', () => window.MLPortal.openAlgorithm(btn.getAttribute('data-open-algo')));
       });
     };
 
-    if (input) {
-      input.addEventListener('input', (e) => renderItems(e.target.value));
-    }
-    renderItems('');
+    root.querySelectorAll('[data-alpha]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const L = btn.getAttribute('data-alpha');
+        const input = document.getElementById('glossarySearchInput');
+        if (input && input.value) {
+          input.value = '';
+          renderList('');
+        }
+        const target = document.getElementById('glossary-letter-' + L);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    const input = document.getElementById('glossarySearchInput');
+    if (input) input.addEventListener('input', (e) => renderList(e.target.value));
+    renderList('');
   }
 
   /* ---- 3. About Page ---- */
@@ -157,61 +193,35 @@
     const root = document.getElementById('aboutRoot');
     if (!root || !window.MLCatalog) return;
 
-    const liveCount = window.MLCatalog.getLiveAlgorithms().length;
-    const soonCount = window.MLCatalog.getComingSoonAlgorithms().length;
-
     root.innerHTML = `
       <div class="narrow-container">
+        <div class="studio-breadcrumb" style="margin-bottom:14px;">
+          <a href="#home" data-nav-view="home">Home</a>
+          <span aria-hidden="true">/</span>
+          <strong>About</strong>
+        </div>
+
         <div class="page-header-block">
           <h1 class="page-title">About ML Algo Studio</h1>
-          <p class="page-sub">
-            A hands-on, zero-build-step visual lab that turns textbook machine learning equations into interactive 2D geometry you can touch, compare, and deliberately break.
-          </p>
+          <p class="page-sub">An interactive browser lab for building geometric intuition across ${window.MLCatalog.ALGORITHMS.length} machine learning algorithms.</p>
         </div>
 
         <div class="about-grid">
           <article class="portal-card about-card">
-            <h2>Why Visual Intuition Matters</h2>
-            <p>
-              Machine learning textbooks are full of Greek notation—summations, gradients, and matrix inverses. Under the hood, every algorithm is geometric: lines slicing planes, margins pushing points apart, and clusters shifting toward centers.
-            </p>
-            <p>
-              ML Algo Studio runs <strong>${liveCount} real algorithms</strong> directly in your browser using deterministic seeded math verified against NumPy, paired with KaTeX formulas and runnable Python code.
-            </p>
+            <h2>Direct Manipulation</h2>
+            <p>Every model runs live in your browser with deterministic seeded math verified against NumPy. Move data points, adjust hyperparameters, and inspect exact boundaries, residuals, and derivatives.</p>
           </article>
-
           <article class="portal-card about-card">
-            <h2>The &ldquo;Break It on Purpose&rdquo; Philosophy</h2>
-            <p>
-              You only truly understand an algorithm once you see how it fails. Every live engine includes tailored one-click failure presets—high-leverage outliers, tiny K values, extreme RBF gamma, or non-linear rings on linear models—so you can watch failure modes happen live and fix them.
-            </p>
-          </article>
-
-          <article class="portal-card about-card">
-            <h2>Dual Visual Modes &amp; Accessibility</h2>
-            <p>
-              Switch anytime in the header between <strong>Soft mode</strong> (subtle elevation shadows and frosted blur) and <strong>Strict Flat mode</strong> (zero shadows, crisp 1px borders), plus <strong>Light</strong> and <strong>Dark</strong> themes with colorblind-safe Okabe–Ito palettes.
-            </p>
-          </article>
-
-          <article class="portal-card about-card">
-            <h2>What&rsquo;s Next on the Roadmap</h2>
-            <p>
-              Alongside the ${liveCount} live Studio engines, ${soonCount} additional topics—including Gradient Descent contours, Optimizer races, Ridge/Lasso regularization, DBSCAN, t-SNE, and Attention—are organized in the Gallery and tracked in <code>ROADMAP.md</code>.
-            </p>
-            <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
-              <button type="button" class="btn btn-primary btn-sm" id="aboutOpenStudioBtn">Launch Studio</button>
-              <button type="button" class="btn btn-sm" id="aboutOpenGalleryBtn">Explore Gallery</button>
-            </div>
+            <h2>Break It on Purpose</h2>
+            <p>Understanding an algorithm means knowing where it breaks. Each engine includes one-click failure cases—leverage outliers, vanishing gradients, saddle points, and non-linear manifolds.</p>
           </article>
         </div>
       </div>
     `;
 
-    const sBtn = document.getElementById('aboutOpenStudioBtn');
-    const gBtn = document.getElementById('aboutOpenGalleryBtn');
-    if (sBtn) sBtn.addEventListener('click', () => window.MLPortal.openStudio('linear_reg'));
-    if (gBtn) gBtn.addEventListener('click', () => window.MLPortal.setView('visualizations'));
+    root.querySelectorAll('[data-nav-view]').forEach((a) => {
+      a.addEventListener('click', (e) => { e.preventDefault(); window.MLPortal.setView(a.getAttribute('data-nav-view')); });
+    });
   }
 
   function initPages() {
@@ -221,10 +231,6 @@
   }
 
   window.MLPages = { renderLearningPath, renderGlossary, renderAbout };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPages);
-  } else {
-    initPages();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPages);
+  else initPages();
 })();

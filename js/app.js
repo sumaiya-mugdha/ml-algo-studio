@@ -1674,7 +1674,7 @@
       if (target.live && target.studioId) {
         return `<button type="button" class="studio-nav-chip live" data-jump-studio="${target.studioId}">${arrow} ${target.title}</button>`;
       }
-      return `<button type="button" class="studio-nav-chip soon" data-jump-gallery="${target.category}">${arrow} ${target.title} <em>(Soon)</em></button>`;
+      return `<button type="button" class="studio-nav-chip live" data-jump-lab="${target.id}">${arrow} ${target.title}</button>`;
     }).filter(Boolean).join('');
 
     const prereqHtml = renderLinks(item.prerequisites || [], '&larr;');
@@ -1695,9 +1695,9 @@
     host.querySelectorAll('[data-jump-studio]').forEach((b) => {
       b.addEventListener('click', () => selectAlgo(b.getAttribute('data-jump-studio')));
     });
-    host.querySelectorAll('[data-jump-gallery]').forEach((b) => {
+    host.querySelectorAll('[data-jump-lab]').forEach((b) => {
       b.addEventListener('click', () => {
-        if (window.MLPortal) window.MLPortal.openGalleryWithFilter(b.getAttribute('data-jump-gallery'));
+        if (window.MLPortal) window.MLPortal.openAlgorithm(b.getAttribute('data-jump-lab'));
       });
     });
   }

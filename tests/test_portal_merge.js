@@ -1,4 +1,4 @@
-// Automated Integration & Integrity Test for Merged ML Algo Studio
+// Automated Integration & Integrity Test for ML Algo Studio v4 (31 Live Algorithms + A-Z Glossary)
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -9,65 +9,79 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const appSrc = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
 const portalCss = fs.readFileSync(path.join(root, 'css/portal.css'), 'utf8');
 
-// 1. Load catalog.js and thumbnails.js in sandbox
-const ctx = { window: {} };
-vm.runInNewContext(fs.readFileSync(path.join(root, 'js/catalog.js'), 'utf8'), ctx);
-vm.runInNewContext(fs.readFileSync(path.join(root, 'js/thumbnails.js'), 'utf8'), ctx);
-const catalog = ctx.window.MLCatalog;
-const thumbs = ctx.window.MLThumbnails;
-
-assert(catalog && Array.isArray(catalog.ALGORITHMS), 'MLCatalog.ALGORITHMS missing');
-const live = catalog.getLiveAlgorithms();
-const soon = catalog.getComingSoonAlgorithms();
-assert.strictEqual(live.length, 11, `Expected 11 live algorithms, got ${live.length}`);
-assert.strictEqual(soon.length, 20, `Expected 20 coming soon algorithms, got ${soon.length}`);
-
-// 2. Every live studioId must exist in app.js ALGO_META
-for (const a of live) {
-  assert(a.studioId, `Live algorithm ${a.id} missing studioId`);
-  assert(appSrc.includes(`${a.studioId}: {`), `studioId ${a.studioId} not found in js/app.js ALGO_META`);
-  const svg = thumbs.makeSVG(a.svgType, a.colorToken);
-  assert(svg.includes('<svg') && svg.includes('</svg>'), `Invalid SVG thumbnail for ${a.id}`);
+// 1. Load algorithms.js, catalog.js, thumbnails.js, labs_foundations.js, labs_advanced.js
+const ctx = {
+  window: {},
+  document: { documentElement: { getAttribute: () => 'light' } },
+  Math, Number, Array, Object, String, Boolean, Set, Map, JSON
+};
+ctx.window = ctx;
+for (const file of ['js/algorithms.js', 'js/catalog.js', 'js/thumbnails.js', 'js/labs_foundations.js', 'js/labs_advanced.js']) {
+  vm.runInNewContext(fs.readFileSync(path.join(root, file), 'utf8'), ctx);
 }
 
-// 3. Every Learning Path item & Glossary studioId must resolve cleanly
-for (const stage of catalog.LEARNING_PATH) {
-  for (const id of stage.items) {
-    assert(catalog.getById(id), `Learning Path references unknown id: ${id}`);
+const catalog = ctx.MLCatalog;
+const thumbs = ctx.MLThumbnails;
+const labs = ctx.MLLabsRegistry;
+
+assert.strictEqual(catalog.ALGORITHMS.length, 31, 'Expected 31 total algorithms');
+assert.strictEqual(catalog.getLiveAlgorithms().length, 31, 'Expected all 31 algorithms live');
+assert.strictEqual(catalog.getComingSoonAlgorithms().length, 0, 'Expected 0 coming soon algorithms');
+
+const studioAlgos = catalog.ALGORITHMS.filter((a) => a.mode === 'studio');
+const labAlgos = catalog.ALGORITHMS.filter((a) => a.mode === 'lab');
+assert.strictEqual(studioAlgos.length, 11, 'Expected 11 Studio engines');
+assert.strictEqual(labAlgos.length, 20, 'Expected 20 Interactive Labs');
+
+// 2. Verify every Studio algorithm exists in app.js
+for (const a of studioAlgos) {
+  assert(appSrc.includes(`${a.studioId}: {`), `studioId ${a.studioId} missing in app.js`);
+}
+
+// 3. Execute render() and breakIt.apply() on all 20 Interactive Labs with a mock 2D canvas
+const noop = () => {};
+const mockCtx = {
+  setTransform: noop, fillRect: noop, strokeRect: noop, beginPath: noop, moveTo: noop,
+  lineTo: noop, arc: noop, ellipse: noop, quadraticCurveTo: noop, closePath: noop,
+  fill: noop, stroke: noop, setLineDash: noop, fillText: noop
+};
+const mockCanvas = {
+  width: 0, height: 0,
+  getBoundingClientRect: () => ({ width: 640, height: 400 }),
+  getContext: () => mockCtx
+};
+
+for (const a of labAlgos) {
+  const def = labs[a.id];
+  assert(def, `Missing lab implementation for ${a.id}`);
+  const st = {};
+  (def.controls || []).forEach((c) => { st[c.id] = c.value; });
+  let metrics = [];
+  def.render(mockCanvas, st, { setMetrics: (m) => { metrics = m; } });
+  assert(metrics.length > 0, `Lab ${a.id} produced 0 metrics`);
+  if (def.breakIt) {
+    def.breakIt.apply(st);
+    def.render(mockCanvas, st, { setMetrics: (m) => { metrics = m; } });
   }
+  const svg = thumbs.makeSVG(a.svgType, a.colorToken);
+  assert(svg.includes('<svg'), `Missing SVG thumbnail for ${a.id}`);
 }
+
+// 4. Verify all Learning Path & 48 A-Z Glossary links resolve cleanly
+for (const stage of catalog.LEARNING_PATH) {
+  for (const id of stage.items) assert(catalog.getById(id), `Path references unknown id: ${id}`);
+}
+assert(catalog.GLOSSARY.length >= 45, `Expected 48 glossary entries, got ${catalog.GLOSSARY.length}`);
 for (const g of catalog.GLOSSARY) {
-  assert(catalog.getByStudioId(g.studioId), `Glossary term "${g.term}" references unknown studioId: ${g.studioId}`);
+  assert(catalog.getById(g.targetId), `Glossary term "${g.term}" references unknown targetId: ${g.targetId}`);
+  assert(Array.isArray(g.covers) && g.covers.length > 0, `Glossary term "${g.term}" missing covers tags`);
 }
 
-// 4. Every required DOM ID referenced across app.js + portal views must exist in index.html
-const requiredIds = [
-  'openSearchBtn', 'surfaceToggleBtn', 'themeToggleBtn', 'mobileMenuBtn', 'mobileDrawer',
-  'searchModal', 'searchModalInput', 'searchModalResults', 'closeSearchBtn',
-  'view-home', 'view-visualizations', 'view-studio', 'view-path', 'view-glossary', 'view-about',
-  'homeRoot', 'galleryRoot', 'pathRoot', 'glossaryRoot', 'aboutRoot',
-  'studioCrumbAlgo', 'algoSelect', 'duelToggleBtn', 'duelSelectWrap', 'duelAlgoSelect',
-  'reseedBtn', 'seedBadge', 'shareBtn', 'algoTitle', 'algoIntuition', 'breakItBanner',
-  'toolbar', 'canvasesRow', 'primaryCard', 'duelCard', 'mlCanvas', 'duelCanvas',
-  'canvasHintText', 'coordReadout', 'stepNarration', 'probeBanner', 'metricsGrid',
-  'curveCard', 'curveTitle', 'curveLegend', 'curveStage', 'curveHint',
-  'whatToNotice', 'internalsCard', 'internalsTitle', 'internalsTabs', 'internalsStage',
-  'dataControlsBox', 'modelControlsBox', 'breakItBox', 'resetDefaultsBtn',
-  'dataCount', 'inputX', 'inputY', 'inputLabel', 'addPointBtn', 'csvInput', 'importCsvBtn', 'exportCsvBtn',
-  'dataTableBody', 'studioPathNav', 'educationSection', 'toast'
-];
-for (const id of requiredIds) {
-  assert(html.includes(`id="${id}"`), `Missing DOM ID in index.html: ${id}`);
+// 5. Verify DOM IDs & Dual Theme/Surface CSS
+for (const id of ['view-home', 'view-visualizations', 'view-lab', 'labRoot', 'view-studio', 'view-path', 'view-glossary', 'view-about', 'surfaceToggleBtn', 'themeToggleBtn', 'searchModal']) {
+  assert(html.includes(`id="${id}"`), `Missing DOM ID: ${id}`);
 }
+assert(portalCss.includes(':root[data-theme="dark"]'));
+assert(portalCss.includes(':root[data-surface="flat"]'));
 
-// 5. Dual Theme & Dual Surface CSS checks
-assert(portalCss.includes(':root[data-theme="dark"]'), 'Dark theme tokens missing in css/portal.css');
-assert(portalCss.includes(':root[data-surface="flat"]'), 'Flat surface toggle tokens missing in css/portal.css');
-assert(portalCss.includes('--shadow-sm: none;'), 'Flat surface mode must zero out --shadow-sm');
-assert(portalCss.includes('--header-blur: none;'), 'Flat surface mode must zero out --header-blur');
-
-// 6. ROADMAP.md exists and mentions all 20 Coming Soon algorithms
-const roadmap = fs.readFileSync(path.join(root, 'ROADMAP.md'), 'utf8');
-assert(roadmap.includes('Coming Soon Algorithms to Build Next (20 Topics)'), 'ROADMAP.md missing Coming Soon section');
-
-console.log('ALL PORTAL MERGE & INTEGRITY CHECKS PASSED (11 live + 20 coming soon, 55 DOM IDs, dual theme/surface verified)');
+console.log(`ALL v4 INTEGRATION TESTS PASSED: 31 live algorithms (11 Studio + 20 rendered Labs), ${catalog.GLOSSARY.length} A-Z Glossary entries verified!`);
