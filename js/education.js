@@ -78,7 +78,7 @@
               latex: 'w = \\frac{7.0}{5.0} = 1.4, \\quad b = \\bar{y} - w \\bar{x} = 4.0 - (1.4 \\times 2.5) = 4.0 - 3.5 = 0.5 \\implies \\hat{y} = 1.4 x + 0.5'
             },
             {
-              step: 'Step 5: Compute Residuals (r_i = y_i - \\hat{y}_i), SSE, MSE, and R²',
+              step: 'Step 5: Compute Residuals ($r_i = y_i - \\hat{y}_i$), SSE, MSE, and $R^2$',
               heading: 'Evaluate model fit and sum of squared errors',
               latex: '\\begin{aligned} \\hat{y} &= [1.4(1)+0.5,\\; 1.4(2)+0.5,\\; 1.4(3)+0.5,\\; 1.4(4)+0.5] = [1.9,\\; 3.3,\\; 4.7,\\; 6.1] \\\\ r_i &= [2 - 1.9,\\; 3 - 3.3,\\; 5 - 4.7,\\; 6 - 6.1] = [+0.1,\\; -0.3,\\; +0.3,\\; -0.1] \\quad (\\textstyle\\sum r_i = 0) \\\\ \\text{SSE} &= (0.1)^2 + (-0.3)^2 + (0.3)^2 + (-0.1)^2 = 0.01 + 0.09 + 0.09 + 0.01 = 0.20 \\\\ \\text{MSE} &= \\frac{\\text{SSE}}{N} = \\frac{0.20}{4} = 0.05, \\quad \\text{SST} = \\sum(y_i - \\bar{y})^2 = 10.0 \\implies R^2 = 1 - \\frac{0.20}{10.0} = 0.98 \\end{aligned}'
             }
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         },
         {
           q: 'Can the R² (Coefficient of Determination) score ever be negative?',
-          a: 'Yes. $R^2 = 1 - \\frac{\\text{SSE}}{\\text{SST}}$. A baseline model predicting the mean $\\bar{y}$ has an $R^2$ of 0. If a regression model is tested on unseen out-of-sample data, or if fitted without an intercept, its predictions can be worse than predicting the mean ($\text{SSE} > \text{SST}$), resulting in a negative $R^2$.'
+          a: 'Yes. $R^2 = 1 - \\frac{\\text{SSE}}{\\text{SST}}$. A baseline model predicting the mean $\\bar{y}$ has an $R^2$ of 0. If a regression model is tested on unseen out-of-sample data, or if fitted without an intercept, its predictions can be worse than predicting the mean ($\\text{SSE} > \\text{SST}$), resulting in a negative $R^2$.'
         },
         {
           q: 'Does a correlation coefficient of zero imply that two variables have no relationship?',
@@ -265,7 +265,7 @@ if __name__ == "__main__":
               latex: '\\begin{aligned} z_1 &= 1.0(-2) + 0 = -2.0, \\quad z_2 = 1.0(-1) + 0 = -1.0 \\\\ z_3 &= 1.0(1) + 0 = +1.0, \\quad z_4 = 1.0(2) + 0 = +2.0 \\\\ \\mathbf{z} &= [-2.0,\\; -1.0,\\; +1.0,\\; +2.0] \\end{aligned}'
             },
             {
-              step: 'Step 2: Apply Sigmoid Function (\\hat{p}_i = \\sigma(z_i))',
+              step: 'Step 2: Apply Sigmoid Function ($\\hat{p}_i = \\sigma(z_i)$)',
               heading: 'Convert linear logits into posterior class probabilities',
               latex: '\\begin{aligned} \\hat{p}_1 &= \\sigma(-2) = \\frac{1}{1 + e^{2}} \\approx 0.119 \\\\ \\hat{p}_2 &= \\sigma(-1) = \\frac{1}{1 + e^{1}} \\approx 0.269 \\\\ \\hat{p}_3 &= \\sigma(1) = \\frac{1}{1 + e^{-1}} \\approx 0.731 \\\\ \\hat{p}_4 &= \\sigma(2) = \\frac{1}{1 + e^{-2}} \\approx 0.881 \\end{aligned}'
             },
@@ -367,7 +367,7 @@ if __name__ == "__main__":
         },
         {
           q: 'How does the Query Probe in the Studio evaluate a test point?',
-          a: 'When you click on the canvas in "Test Query" mode, the model computes $z = w_1 x_1 + w_2 x_2 + b$, evaluates $\\hat{p} = \\sigma(z)$, and reports the exact percentage probability for Class 1 ($\hat{p}$) vs Class 0 ($1 - \\hat{p}$).'
+          a: 'When you click on the canvas in "Test Query" mode, the model computes $z = w_1 x_1 + w_2 x_2 + b$, evaluates $\\hat{p} = \\sigma(z)$, and reports the exact percentage probability for Class 1 ($\\hat{p}$) vs Class 0 ($1 - \\hat{p}$).'
         },
         {
           q: 'How does Logistic Regression handle more than 2 classes?',
@@ -403,7 +403,7 @@ if __name__ == "__main__":
       summary: 'Linear SVM seeks the unique separating hyperplane that maximizes the geometric margin—the perpendicular distance between the decision boundary and the closest data points (Support Vectors). It provides strong generalization guarantees rooted in Vapnik-Chervonenkis (VC) dimension theory.',
       prerequisites: [
         'Hyperplane Geometry ($\\mathbf{w}^T \\mathbf{x} + b = 0$)',
-        'Euclidean Norm (\\|\\mathbf{w}\\|)',
+        'Euclidean Norm ($\\|\\mathbf{w}\\|$)',
         'Hinge Loss & Convex Penalties',
         'Constrained Optimization (Primal vs Dual)'
       ],
@@ -772,7 +772,7 @@ if __name__ == "__main__":
       summary: 'Gaussian Naive Bayes is a generative classifier rooted in Bayes Theorem. It operates on the "naive" conditional independence assumption that features are uncorrelated given the class label, modeling each feature as an independent 1D Gaussian distribution.',
       prerequisites: [
         'Bayes Theorem & Posterior Probability',
-        'Gaussian (Normal) Distribution (\\mu, \\sigma^2)',
+        'Gaussian (Normal) Distribution ($\\mu, \\sigma^2$)',
         'Class Conditional Independence'
       ],
       math: {
@@ -818,7 +818,7 @@ if __name__ == "__main__":
               latex: 'P(y = 0) = \\frac{3}{6} = 0.5, \\quad P(y = 1) = \\frac{3}{6} = 0.5'
             },
             {
-              step: 'Step 2: Compute Class Means (\\mu_c) and Variances (\\sigma_c^2)',
+              step: 'Step 2: Compute Class Means ($\\mu_c$) and Variances ($\\sigma_c^2$)',
               heading: 'Fit 1D normal distributions to each class',
               latex: '\\begin{aligned} \\mu_0 &= \\frac{1 + 2 + 3}{3} = 2.0, \\quad \\sigma_0^2 = \\frac{(1-2)^2 + (2-2)^2 + (3-2)^2}{3} = \\frac{1 + 0 + 1}{3} = \\frac{2}{3} \\approx 0.667 \\\\ \\mu_1 &= \\frac{5 + 6 + 7}{3} = 6.0, \\quad \\sigma_1^2 = \\frac{(5-6)^2 + (6-6)^2 + (7-6)^2}{3} = \\frac{1 + 0 + 1}{3} = \\frac{2}{3} \\approx 0.667 \\end{aligned}'
             },
@@ -1368,7 +1368,7 @@ if __name__ == "__main__":
         'Decision Trees & Shallow Stumps',
         'Gradient Descent in Function Space',
         'Binary Cross-Entropy Loss & Log-Odds',
-        'Learning Rate Shrinkage (\\eta)'
+        'Learning Rate Shrinkage ($\\eta$)'
       ],
       math: {
         intro: 'Gradient Boosting performs functional gradient descent: each new tree added to the ensemble steps in the direction that most steeply reduces total classification loss.',
@@ -1618,12 +1618,12 @@ if __name__ == "__main__":
             { text: 'Sample: x = 1.0, y = 1.0' },
             { text: 'Initial: w_1 = 0.5, b_1 = 0.0' },
             { text: 'Initial: w_2 = 0.8, b_2 = 0.0' },
-            { text: 'Learning Rate: \\eta = 0.1' }
+            { text: 'Learning Rate: $\\eta = 0.1$' }
           ],
           steps: [
             {
               step: 'Step 1: Forward Pass (Hidden Pre-Activation, Tanh, and Output Prediction)',
-              heading: 'Propagate input through hidden neuron to generate prediction \\hat{y}',
+              heading: 'Propagate input through hidden neuron to generate prediction $\\hat{y}$',
               latex: '\\begin{aligned} \\text{Hidden pre-activation: } & \\quad z_1 = w_1 x + b_1 = 0.5(1.0) + 0.0 = 0.500 \\\\ \\text{Hidden activation: } & \\quad a_1 = \\tanh(0.500) \\approx 0.462 \\\\ \\text{Output prediction: } & \\quad \\hat{y} = w_2 a_1 + b_2 = 0.8(0.462) + 0.0 = \\mathbf{0.370} \\end{aligned}'
             },
             {
@@ -1837,7 +1837,7 @@ if __name__ == "__main__":
             { text: 'B = (1, 3)' },
             { text: 'C = (5, 1)' },
             { text: 'D = (5, 3)' },
-            { text: 'Initial Centroids: \\mu_1=(1, 1), \\mu_2=(5, 1)' }
+            { text: 'Initial Centroids: $\\mu_1=(1, 1), \\mu_2=(5, 1)$' }
           ],
           steps: [
             {
@@ -2025,7 +2025,7 @@ if __name__ == "__main__":
           steps: [
             {
               step: 'Step 1: Compute 2×2 Sample Covariance Matrix (n = 4, ddof = 1)',
-              heading: 'Evaluate variances and cross-covariance (zero-mean data: \\bar{x}=0, \\bar{y}=0)',
+              heading: 'Evaluate variances and cross-covariance (zero-mean data: $\\bar{x}=0, \\bar{y}=0$)',
               latex: '\\begin{aligned} \\operatorname{Var}(x) &= \\frac{(-2)^2 + (-1)^2 + 1^2 + 2^2}{3} = \\frac{4 + 1 + 1 + 4}{3} = \\frac{10}{3} \\approx 3.333 \\\\ \\operatorname{Var}(y) &= \\frac{(-1)^2 + (-1)^2 + 1^2 + 1^2}{3} = \\frac{1 + 1 + 1 + 1}{3} = \\frac{4}{3} \\approx 1.333 \\\\ \\operatorname{Cov}(x, y) &= \\frac{(-2)(-1) + (-1)(-1) + (1)(1) + (2)(1)}{3} = \\frac{2 + 1 + 1 + 2}{3} = \\frac{6}{3} = 2.000 \\\\ \\boldsymbol{\\Sigma} &= \\begin{bmatrix} 3.333 & 2.000 \\\\ 2.000 & 1.333 \\end{bmatrix} \\end{aligned}'
             },
             {

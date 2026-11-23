@@ -1435,6 +1435,7 @@
   function selectAlgo(algo, keepPreset = false) {
     stopAnimation();
     state.algo = algo;
+    if (els.algoSelect) els.algoSelect.value = algo;
     state.probePoint = null;
     const meta = ALGO_META[algo];
     if (meta.type === 'binary' && state.activeLabel > 1) state.activeLabel = 0;
@@ -1576,9 +1577,6 @@
     window.selectAlgo = selectAlgo;
     window.addEventListener('resize', drawAllCanvases);
     selectAlgo(state.algo, window.location.search.includes('preset='));
-    if (typeof window.renderEducationSection === 'function') {
-      window.renderEducationSection(state.algo);
-    }
   }
 
   window.addEventListener('DOMContentLoaded', init);
