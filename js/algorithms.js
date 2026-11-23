@@ -33,10 +33,15 @@
     return 1 / (1 + Math.exp(-z));
   }
 
+  function clampFinite(val, limit = 1e4) {
+    if (!Number.isFinite(val)) return limit;
+    return Math.max(-limit, Math.min(limit, val));
+  }
+
   // 1. Linear Regression (OLS + Gradient Descent)
   function fitLinearRegressionOLS(points) {
     const n = points.length;
-    if (n < 2) return { w: 0, b: 0, r2: 0, mse: 0, rmse: 0, epoch: 0, lossHistory: [], valid: false };
+    if (n < 2) return { w: 0, b: 0, r2: 0, mse: 0, rmse: 0, epoch: 0, lossHistory: [], diverged: false, valid: false };
     let sx = 0, sy = 0;
     for (const p of points) { sx += p.x; sy += p.y; }
     const mx = sx / n;
@@ -62,14 +67,17 @@
       dw += (2 / n) * err * p.x;
       db += (2 / n) * err;
     }
-    const w = state.w - lr * dw;
-    const b = state.b - lr * db;
-    return evalLinearRegression(points, w, b, (state.epoch || 0) + 1, state.lossHistory || []);
+    const rawW = state.w - lr * dw;
+    const rawB = state.b - lr * db;
+    const diverged = !Number.isFinite(rawW) || !Number.isFinite(rawB) || Math.abs(rawW) > 500 || Math.abs(rawB) > 500;
+    const w = clampFinite(rawW, 500);
+    const b = clampFinite(rawB, 500);
+    return evalLinearRegression(points, w, b, (state.epoch || 0) + 1, state.lossHistory || [], diverged);
   }
 
-  function evalLinearRegression(points, w, b, epoch = 0, prevHistory = []) {
+  function evalLinearRegression(points, w, b, epoch = 0, prevHistory = [], diverged = false) {
     const n = points.length;
-    if (n === 0) return { w, b, r2: 0, mse: 0, rmse: 0, epoch, lossHistory: [], valid: false };
+    if (n === 0) return { w, b, r2: 0, mse: 0, rmse: 0, epoch, lossHistory: [], diverged: false, valid: false };
     let my = 0;
     for (const p of points) my += p.y;
     my /= n;
@@ -79,18 +87,25 @@
       ssRes += (p.y - pred) ** 2;
       ssTot += (p.y - my) ** 2;
     }
-    const mse = ssRes / n;
+    const mse = clampFinite(ssRes / n, 1e5);
     const rmse = Math.sqrt(mse);
     const r2 = ssTot < 1e-9 ? 1 : Math.max(-9.99, 1 - ssRes / ssTot);
-    const lossHistory = epoch > 0 ? [...prevHistory.slice(-79), mse] : prevHistory;
-    return { w, b, mse, rmse, r2, epoch, lossHistory, valid: n >= 2 };
+    const lossHistory = epoch > 0 ? [...prevHistory.slice(-79), mse] : [mse];
+    return { w, b, mse, rmse, r2, epoch, lossHistory, diverged: diverged || mse > 500, valid: n >= 2 };
+  }
+
+  function getOLSResiduals(points, model) {
+    if (!model || !model.valid || points.length === 0) return [];
+    return [...points]
+      .sort((a, b) => a.x - b.x)
+      .map((p, idx) => ({ idx, x: p.x, y: p.y, residual: p.y - (model.w * p.x + model.b) }));
   }
 
   // 2. Logistic Regression (Binary Classification)
   function stepLogisticRegression(points, state, lr) {
     const binPts = points.filter(p => p.label === 0 || p.label === 1);
     const n = binPts.length;
-    if (n === 0) return { w1: 0, w2: 0, b: 0, loss: 0, acc: 0, epoch: 0, lossHistory: [] };
+    if (n === 0) return { w1: 0, w2: 0, b: 0, loss: 0, acc: 0, epoch: 0, lossHistory: [], accHistory: [], diverged: false };
     let dw1 = 0, dw2 = 0, db = 0;
     for (const p of binPts) {
       const z = state.w1 * p.x + state.w2 * p.y + state.b;
@@ -100,20 +115,24 @@
       dw2 += (err * p.y) / n;
       db += err / n;
     }
+    const nw1 = clampFinite(state.w1 - lr * dw1, 200);
+    const nw2 = clampFinite(state.w2 - lr * dw2, 200);
+    const nb = clampFinite(state.b - lr * db, 200);
     return evalLogisticRegression(
       binPts,
-      state.w1 - lr * dw1,
-      state.w2 - lr * dw2,
-      state.b - lr * db,
+      nw1,
+      nw2,
+      nb,
       (state.epoch || 0) + 1,
-      state.lossHistory || []
+      state.lossHistory || [],
+      state.accHistory || []
     );
   }
 
-  function evalLogisticRegression(points, w1, w2, b, epoch = 0, prevHistory = []) {
+  function evalLogisticRegression(points, w1, w2, b, epoch = 0, prevHistory = [], prevAcc = []) {
     const binPts = points.filter(p => p.label === 0 || p.label === 1);
     const n = binPts.length;
-    if (n === 0) return { w1, w2, b, loss: 0, acc: 0, epoch, lossHistory: [] };
+    if (n === 0) return { w1, w2, b, loss: 0, acc: 0, epoch, lossHistory: [], accHistory: [], diverged: false };
     let loss = 0, correct = 0;
     for (const p of binPts) {
       const prob = sigmoid(w1 * p.x + w2 * p.y + b);
@@ -122,8 +141,11 @@
       if ((prob >= 0.5 ? 1 : 0) === p.label) correct++;
     }
     const avgLoss = loss / n;
+    const acc = correct / n;
     const lossHistory = epoch > 0 ? [...prevHistory.slice(-79), avgLoss] : [avgLoss];
-    return { w1, w2, b, loss: avgLoss, acc: correct / n, epoch, lossHistory };
+    const accHistory = epoch > 0 ? [...prevAcc.slice(-79), acc] : [acc];
+    const diverged = lossHistory.length >= 4 && avgLoss > lossHistory[0] * 1.5 && avgLoss > 1.0;
+    return { w1, w2, b, loss: avgLoss, acc, epoch, lossHistory, accHistory, diverged };
   }
 
   // 3. K-Nearest Neighbors (KNN)
@@ -147,6 +169,42 @@
       }
     }
     return { label: bestLabel, neighbors, votes };
+  }
+
+  function sweepKNN(points, maxK, metric) {
+    const n = points.length;
+    if (n < 2) return [];
+    const limit = Math.min(maxK, n - 1);
+    const distFn = metric === 'manhattan' ? manhattan : euclidean;
+    // Precompute sorted neighbor labels for each point (leave-one-out)
+    const sortedLabels = points.map((p, i) => {
+      const others = [];
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        others.push({ label: points[j].label, idx: j, dist: distFn(p, points[j]) });
+      }
+      others.sort((a, b) => a.dist - b.dist || a.idx - b.idx);
+      return others.map(o => o.label);
+    });
+
+    const curve = [];
+    for (let k = 1; k <= limit; k++) {
+      let correct = 0;
+      for (let i = 0; i < n; i++) {
+        const votes = {};
+        for (let m = 0; m < k; m++) {
+          const lbl = sortedLabels[i][m];
+          votes[lbl] = (votes[lbl] || 0) + 1;
+        }
+        let bestL = 0, bestC = -1;
+        for (const lbl of Object.keys(votes).map(Number).sort((a, b) => a - b)) {
+          if (votes[lbl] > bestC) { bestC = votes[lbl]; bestL = lbl; }
+        }
+        if (bestL === points[i].label) correct++;
+      }
+      curve.push({ param: k, acc: correct / n });
+    }
+    return curve;
   }
 
   // 4. K-Means Clustering (K-Means++ seeded initialization)
@@ -317,6 +375,18 @@
     return { label: cur ? cur.label : 0, path };
   }
 
+  function sweepDecisionTree(points, minSamples) {
+    if (points.length === 0) return [];
+    const curve = [];
+    for (let d = 1; d <= 4; d++) {
+      const tree = fitDecisionTree(points, d, minSamples, 0, false);
+      let correct = 0;
+      for (const p of points) if (predictTree(tree, p) === p.label) correct++;
+      curve.push({ param: d, acc: correct / points.length });
+    }
+    return curve;
+  }
+
   // 6. Random Forest (Bagging + Feature Subsampling)
   function fitRandomForest(points, numTrees, maxDepth, minSamples, rng = Math.random) {
     if (points.length === 0) return { trees: [], accuracies: [] };
@@ -352,6 +422,18 @@
     return best;
   }
 
+  function sweepRandomForest(points, numTrees, minSamples, seed = 42) {
+    if (points.length === 0) return [];
+    const curve = [];
+    for (let d = 1; d <= 4; d++) {
+      const rf = fitRandomForest(points, numTrees, d, minSamples, createPRNG(seed + 101));
+      let correct = 0;
+      for (const p of points) if (predictRandomForest(rf, p) === p.label) correct++;
+      curve.push({ param: d, acc: correct / points.length });
+    }
+    return curve;
+  }
+
   // 7. Neural Network (2 -> H -> C MLP with Backpropagation)
   function initNeuralNet(points, hiddenSize, activation, rng = Math.random) {
     const labels = [...new Set(points.map(p => p.label))];
@@ -367,7 +449,7 @@
       Array.from({ length: hiddenSize }, () => (rng() * 2 - 1) * scale2 * 1.5)
     );
     const b2 = Array(numClasses).fill(0);
-    return evalNeuralNet(points, { W1, b1, W2, b2, hiddenSize, numClasses, activation, epoch: 0, lossHistory: [] });
+    return evalNeuralNet(points, { W1, b1, W2, b2, hiddenSize, numClasses, activation, epoch: 0, lossHistory: [], accHistory: [], diverged: false });
   }
 
   function actFn(z, type) {
@@ -399,7 +481,7 @@
       logits.push(s);
       if (s > maxL) maxL = s;
     }
-    const exps = logits.map(l => Math.exp(l - maxL));
+    const exps = logits.map(l => Math.exp(Math.max(-50, Math.min(50, l - maxL))));
     const sumE = exps.reduce((a, b) => a + b, 0) || 1;
     const probs = exps.map(e => e / sumE);
     return { x: [x0, x1], z1, h, probs };
@@ -435,10 +517,10 @@
       }
     }
 
-    const W1 = net.W1.map((row, i) => [row[0] - lr * dW1[i][0], row[1] - lr * dW1[i][1]]);
-    const b1 = net.b1.map((v, i) => v - lr * db1[i]);
-    const W2 = net.W2.map((row, c) => row.map((v, i) => v - lr * dW2[c][i]));
-    const b2 = net.b2.map((v, c) => v - lr * db2[c]);
+    const W1 = net.W1.map((row, i) => [clampFinite(row[0] - lr * dW1[i][0], 80), clampFinite(row[1] - lr * dW1[i][1], 80)]);
+    const b1 = net.b1.map((v, i) => clampFinite(v - lr * db1[i], 80));
+    const W2 = net.W2.map((row, c) => row.map((v, i) => clampFinite(v - lr * dW2[c][i], 80)));
+    const b2 = net.b2.map((v, c) => clampFinite(v - lr * db2[c], 80));
 
     return evalNeuralNet(points, { ...net, W1, b1, W2, b2, epoch: net.epoch + 1 });
   }
@@ -458,8 +540,11 @@
       if (bestC === target) correct++;
     }
     const avgLoss = loss / n;
+    const acc = correct / n;
     const lossHistory = [...(net.lossHistory || []).slice(-79), avgLoss];
-    return { ...net, loss: avgLoss, acc: correct / n, lossHistory };
+    const accHistory = [...(net.accHistory || []).slice(-79), acc];
+    const diverged = lossHistory.length >= 4 && avgLoss > lossHistory[0] * 1.4 && avgLoss > 1.2;
+    return { ...net, loss: avgLoss, acc, lossHistory, accHistory, diverged };
   }
 
   function predictNeuralNet(net, pt) {
@@ -529,13 +614,14 @@
   function fitGradientBoosting(points, nStages, lr, maxDepth) {
     const binPts = points.filter(p => p.label === 0 || p.label === 1);
     const n = binPts.length;
-    if (n === 0) return { baseLogOdds: 0, stages: [], lr, lossHistory: [], acc: 0 };
+    if (n === 0) return { baseLogOdds: 0, stages: [], lr, lossHistory: [], accHistory: [], acc: 0 };
     const pos = binPts.filter(p => p.label === 1).length;
     const p0 = Math.min(0.99, Math.max(0.01, pos / n));
     const baseLogOdds = Math.log(p0 / (1 - p0));
     const F = Array(n).fill(baseLogOdds);
     const stages = [];
     const lossHistory = [];
+    const accHistory = [];
 
     for (let s = 0; s < nStages; s++) {
       const items = binPts.map((pt, i) => {
@@ -544,20 +630,25 @@
       });
       const tree = fitRegTreeForGB(items, maxDepth);
       stages.push(tree);
-      let loss = 0;
+      let loss = 0, stageCorrect = 0;
       for (let i = 0; i < n; i++) {
         F[i] += lr * predictRegTree(tree, binPts[i]);
         const pr = Math.min(1 - 1e-12, Math.max(1e-12, sigmoid(F[i])));
         loss -= binPts[i].label * Math.log(pr) + (1 - binPts[i].label) * Math.log(1 - pr);
+        if ((pr >= 0.5 ? 1 : 0) === binPts[i].label) stageCorrect++;
       }
       lossHistory.push(loss / n);
+      accHistory.push(stageCorrect / n);
     }
 
-    let correct = 0;
-    for (let i = 0; i < n; i++) {
-      if ((sigmoid(F[i]) >= 0.5 ? 1 : 0) === binPts[i].label) correct++;
-    }
-    return { baseLogOdds, stages, lr, lossHistory, acc: correct / n };
+    return {
+      baseLogOdds,
+      stages,
+      lr,
+      lossHistory,
+      accHistory,
+      acc: accHistory.length ? accHistory[accHistory.length - 1] : 0
+    };
   }
 
   function predictGradientBoosting(gb, pt) {
@@ -574,7 +665,7 @@
   function stepLinearSVM(points, state, lr, C) {
     const binPts = points.filter(p => p.label === 0 || p.label === 1);
     const n = binPts.length;
-    if (n === 0) return { w1: 0.5, w2: -0.5, b: 0, acc: 0, margin: 0, loss: 0, epoch: 0, lossHistory: [], supportIndices: [] };
+    if (n === 0) return { w1: 0.5, w2: -0.5, b: 0, acc: 0, margin: 0, loss: 0, epoch: 0, lossHistory: [], accHistory: [], supportIndices: [], diverged: false };
     const lambda = 1 / Math.max(0.01, C * n);
     let dw1 = lambda * state.w1, dw2 = lambda * state.w2, db = 0;
     for (const p of binPts) {
@@ -587,16 +678,17 @@
     }
     return evalLinearSVM(
       points,
-      state.w1 - lr * dw1,
-      state.w2 - lr * dw2,
-      state.b - lr * db,
+      clampFinite(state.w1 - lr * dw1, 200),
+      clampFinite(state.w2 - lr * dw2, 200),
+      clampFinite(state.b - lr * db, 200),
       (state.epoch || 0) + 1,
       C,
-      state.lossHistory || []
+      state.lossHistory || [],
+      state.accHistory || []
     );
   }
 
-  function evalLinearSVM(points, w1, w2, b, epoch = 0, C = 2.0, prevHistory = []) {
+  function evalLinearSVM(points, w1, w2, b, epoch = 0, C = 2.0, prevHistory = [], prevAcc = []) {
     const binPts = points.filter(p => p.label === 0 || p.label === 1);
     let correct = 0;
     let hingeSum = 0;
@@ -614,14 +706,19 @@
     const norm = Math.hypot(w1, w2);
     const regLoss = 0.5 * (w1 * w1 + w2 * w2) / Math.max(0.01, C * Math.max(1, binPts.length));
     const loss = binPts.length ? (hingeSum / binPts.length) + regLoss : 0;
+    const acc = binPts.length ? correct / binPts.length : 0;
     const lossHistory = epoch > 0 ? [...prevHistory.slice(-79), loss] : [loss];
+    const accHistory = epoch > 0 ? [...prevAcc.slice(-79), acc] : [acc];
+    const diverged = lossHistory.length >= 4 && loss > lossHistory[0] * 1.6 && loss > 1.5;
     return {
       w1, w2, b,
-      acc: binPts.length ? correct / binPts.length : 0,
+      acc,
       margin: norm > 1e-6 ? 2 / norm : 0,
       loss,
       epoch,
       lossHistory,
+      accHistory,
+      diverged,
       supportIndices
     };
   }
@@ -729,17 +826,21 @@
     fitLinearRegressionOLS,
     stepLinearRegressionGD,
     evalLinearRegression,
+    getOLSResiduals,
     stepLogisticRegression,
     evalLogisticRegression,
     predictKNN,
+    sweepKNN,
     initKMeans,
     assignKMeans,
     stepKMeans,
     fitDecisionTree,
     predictTree,
     traceTree,
+    sweepDecisionTree,
     fitRandomForest,
     predictRandomForest,
+    sweepRandomForest,
     initNeuralNet,
     stepNeuralNet,
     evalNeuralNet,

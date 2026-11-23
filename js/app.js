@@ -15,92 +15,90 @@
   const ALGO_META = {
     neural_net: {
       name: 'Neural Network (MLP)',
-      badge: 'Classification',
       type: 'multiclass',
-      iterative: true,
       intuition: 'Combines curved hidden-layer boundaries so the model can separate data that no single straight line can divide.',
       notice: 'On Two Moons or XOR, watch how 2 hidden neurons struggle while 5+ neurons bend the boundary around both classes.'
     },
     logistic_reg: {
       name: 'Logistic Regression',
-      badge: 'Binary',
       type: 'binary',
-      iterative: true,
       intuition: 'Draws one straight line and turns distance from that line into a smooth probability between 0% and 100%.',
       notice: 'Switch to Two Moons or XOR in Duel Mode against a Neural Network to see where a single straight boundary hits its limit.'
     },
     svm: {
       name: 'Linear SVM',
-      badge: 'Margin',
       type: 'binary',
-      iterative: true,
       intuition: 'Finds the straight boundary that leaves the widest empty street (margin) between two classes.',
       notice: 'Outlined points are support vectors; lowering C allows a wider margin with some misclassifications.'
     },
     knn: {
       name: 'K-Nearest Neighbors',
-      badge: 'Instance',
       type: 'multiclass',
-      iterative: false,
       intuition: 'Predicts a point’s class by holding a majority vote among its K closest neighbors.',
-      notice: 'Try K = 1 for jagged islands around every outlier, then raise K to 9+ to see the boundary smooth out.'
+      notice: 'Drag the ringed query point across the canvas; try K = 1 for jagged islands, then raise K to smooth the boundary.'
     },
     decision_tree: {
       name: 'Decision Tree (CART)',
-      badge: 'Tree',
       type: 'multiclass',
-      iterative: false,
       intuition: 'Splits the plane with horizontal and vertical cuts, picking whichever cut makes each side purest.',
       notice: 'Every region has strictly vertical or horizontal walls; raising Max Depth creates smaller, sharper boxes.'
     },
     random_forest: {
       name: 'Random Forest',
-      badge: 'Ensemble',
       type: 'multiclass',
-      iterative: false,
       intuition: 'Trains many slightly different decision trees on random subsets and averages their votes to reduce overfitting.',
       notice: 'Compare against a single Decision Tree in Duel Mode to see how voting softens extreme single-tree splits.'
     },
     gradient_boosting: {
       name: 'Gradient Boosting',
-      badge: 'Boosting',
       type: 'binary',
-      iterative: false,
       intuition: 'Builds shallow trees one after another, where each new tree focuses on fixing the mistakes of the previous ones.',
-      notice: 'Raise Boosting Stages from 1 to 10 and watch the stage-by-stage loss curve drop as the boundary sharpens.'
+      notice: 'Raise Boosting Rounds from 1 to 10 and watch the stage-by-stage loss curve drop as the boundary sharpens.'
     },
     naive_bayes: {
       name: 'Gaussian Naive Bayes',
-      badge: 'Probabilistic',
       type: 'multiclass',
-      iterative: false,
       intuition: 'Fits an axis-aligned bell curve around each class and assigns new points to the most likely cloud.',
-      notice: 'Dashed ellipses show 1 and 2 standard deviations; it assumes X and Y vary independently.'
+      notice: 'Dashed ellipses show 1 and 2 standard deviations; the chart below shows how each class’s X bell curves overlap.'
     },
     linear_reg: {
       name: 'Linear Regression',
-      badge: 'Regression',
       type: 'regression',
-      iterative: true,
       intuition: 'Finds the single straight line that minimizes the average squared vertical distance to every point.',
-      notice: 'Switch Solver to Gradient Descent and click Step to watch the line rotate and shift toward the exact OLS answer.'
+      notice: 'Switch Solver to Gradient Descent and click Step to watch the line rotate toward the exact OLS answer.'
     },
     kmeans: {
       name: 'K-Means Clustering',
-      badge: 'Clustering',
       type: 'unlabeled',
-      iterative: true,
       intuition: 'Groups unlabeled points by repeating two steps: assign points to the nearest center, then move each center to its group mean.',
       notice: 'Click Step to watch centroids follow the dashed trails until inertia stops dropping.'
     },
     pca: {
       name: 'PCA (2D to 1D)',
-      badge: 'Dim. Reduction',
       type: 'unlabeled',
-      iterative: false,
       intuition: 'Finds the direction (PC1) where the data spreads out the most so you can project 2D points onto 1D with minimal loss.',
       notice: 'Yellow segments show projection error; PC2 is always perpendicular to PC1.'
     }
+  };
+
+  const DEFAULT_PARAMS = {
+    spread: 1.0,
+    lr: 0.12,
+    k: 5,
+    metric: 'euclidean',
+    kmeansK: 3,
+    maxDepth: 3,
+    minSamples: 2,
+    numTrees: 5,
+    gbStages: 8,
+    gbLr: 0.35,
+    gbDepth: 2,
+    nnHidden: 5,
+    nnAct: 'tanh',
+    svmC: 2.0,
+    showResiduals: true,
+    showProjections: true,
+    regSolver: 'ols'
   };
 
   const state = {
@@ -112,29 +110,16 @@
     points: [],
     activeLabel: 0,
     mode: 'add',
-    probePoint: null,
+    probePoint: { x: 0, y: 0 },
+    draggingProbe: false,
+    didDragProbe: false,
+    playbackSpeed: 1,
     running: false,
     timerId: null,
     selectedTreeIdx: 0,
     selectedStageIdx: 0,
-    params: {
-      lr: 0.12,
-      k: 5,
-      metric: 'euclidean',
-      kmeansK: 3,
-      maxDepth: 3,
-      minSamples: 2,
-      numTrees: 5,
-      gbStages: 8,
-      gbLr: 0.35,
-      gbDepth: 2,
-      nnHidden: 5,
-      nnAct: 'tanh',
-      svmC: 2.0,
-      showResiduals: true,
-      showProjections: true,
-      regSolver: 'ols'
-    },
+    lastActionNote: '',
+    params: { ...DEFAULT_PARAMS },
     models: {},
     duelModels: {}
   };
@@ -153,6 +138,19 @@
     showToast._tid = setTimeout(() => els.toast.classList.remove('show'), 2200);
   }
 
+  function getStepIntervalMs() {
+    const base = state.algo === 'kmeans' ? 420 : 60;
+    const adjusted = Math.round(base / state.playbackSpeed);
+    return prefersReducedMotion() ? Math.max(180, adjusted) : Math.max(25, adjusted);
+  }
+
+  function startAnimation() {
+    stopAnimation();
+    state.running = true;
+    updateRunButtons();
+    state.timerId = setInterval(stepCurrentModels, getStepIntervalMs());
+  }
+
   function stopAnimation() {
     state.running = false;
     if (state.timerId) {
@@ -167,6 +165,7 @@
     p.set('algo', state.algo);
     p.set('seed', String(state.seed));
     p.set('preset', state.preset);
+    p.set('spread', String(state.params.spread));
     if (state.duelMode) {
       p.set('duel', '1');
       p.set('duelAlgo', state.duelAlgo);
@@ -180,11 +179,13 @@
     const algo = p.get('algo');
     const seed = Number(p.get('seed'));
     const preset = p.get('preset');
+    const spread = Number(p.get('spread'));
     const duel = p.get('duel');
     const duelAlgo = p.get('duelAlgo');
     if (algo && ALGO_META[algo]) state.algo = algo;
     if (!Number.isNaN(seed) && seed > 0) state.seed = Math.floor(seed);
     if (preset) state.preset = preset;
+    if (!Number.isNaN(spread) && spread >= 0.2 && spread <= 2.5) state.params.spread = Number(spread.toFixed(1));
     if (duel === '1') state.duelMode = true;
     if (duelAlgo && ALGO_META[duelAlgo]) state.duelAlgo = duelAlgo;
   }
@@ -217,9 +218,15 @@
     return 'separable';
   }
 
+  function isClassificationAlgo(algo) {
+    const t = ALGO_META[algo].type;
+    return t === 'binary' || t === 'multiclass';
+  }
+
   function loadPreset(presetName) {
     stopAnimation();
     state.preset = presetName;
+    const sp = state.params.spread;
     const rng = ML.createPRNG(state.seed);
     const randn = () => {
       let u = 0, v = 0;
@@ -231,45 +238,46 @@
 
     if (presetName === 'linear') {
       for (let i = 0; i < 28; i++) {
-        const x = -4 + (8 * i) / 27 + randn() * 0.2;
-        const y = 0.72 * x + 0.4 + randn() * 0.65;
+        const x = -4 + (8 * i) / 27 + randn() * 0.2 * sp;
+        const y = 0.72 * x + 0.4 + randn() * 0.65 * sp;
         pts.push({ x: clamp(x), y: clamp(y), label: 0 });
       }
     } else if (presetName === 'separable') {
       for (let i = 0; i < 18; i++) {
-        pts.push({ x: clamp(-1.8 + randn() * 0.85), y: clamp(1.5 + randn() * 0.85), label: 0 });
-        pts.push({ x: clamp(1.8 + randn() * 0.85), y: clamp(-1.5 + randn() * 0.85), label: 1 });
+        pts.push({ x: clamp(-1.8 + randn() * 0.85 * sp), y: clamp(1.5 + randn() * 0.85 * sp), label: 0 });
+        pts.push({ x: clamp(1.8 + randn() * 0.85 * sp), y: clamp(-1.5 + randn() * 0.85 * sp), label: 1 });
       }
     } else if (presetName === 'blobs3') {
       const centers = [[-2.2, 2.0, 0], [2.2, 1.8, 1], [0.0, -2.2, 2]];
       for (const [cx, cy, lbl] of centers) {
         for (let i = 0; i < 14; i++) {
-          pts.push({ x: clamp(cx + randn() * 0.75), y: clamp(cy + randn() * 0.75), label: lbl });
+          pts.push({ x: clamp(cx + randn() * 0.75 * sp), y: clamp(cy + randn() * 0.75 * sp), label: lbl });
         }
       }
     } else if (presetName === 'moons') {
       for (let i = 0; i < 20; i++) {
         const a = (Math.PI * i) / 19;
-        pts.push({ x: clamp(Math.cos(a) * 2.2 - 0.8 + randn() * 0.25), y: clamp(Math.sin(a) * 2.2 - 0.3 + randn() * 0.25), label: 0 });
-        pts.push({ x: clamp(1.0 - Math.cos(a) * 2.2 + randn() * 0.25), y: clamp(0.4 - Math.sin(a) * 2.2 + randn() * 0.25), label: 1 });
+        pts.push({ x: clamp(Math.cos(a) * 2.2 - 0.8 + randn() * 0.25 * sp), y: clamp(Math.sin(a) * 2.2 - 0.3 + randn() * 0.25 * sp), label: 0 });
+        pts.push({ x: clamp(1.0 - Math.cos(a) * 2.2 + randn() * 0.25 * sp), y: clamp(0.4 - Math.sin(a) * 2.2 + randn() * 0.25 * sp), label: 1 });
       }
     } else if (presetName === 'xor') {
       const quads = [[-2, 2, 0], [2, -2, 0], [2, 2, 1], [-2, -2, 1]];
       for (const [cx, cy, lbl] of quads) {
         for (let i = 0; i < 9; i++) {
-          pts.push({ x: clamp(cx + randn() * 0.65), y: clamp(cy + randn() * 0.65), label: lbl });
+          pts.push({ x: clamp(cx + randn() * 0.65 * sp), y: clamp(cy + randn() * 0.65 * sp), label: lbl });
         }
       }
     } else if (presetName === 'correlated') {
       for (let i = 0; i < 36; i++) {
         const t = randn() * 1.6;
-        const n = randn() * 0.55;
+        const n = randn() * 0.55 * sp;
         pts.push({ x: clamp(t * 0.9 - n * 0.4), y: clamp(t * 0.75 + n * 0.5), label: 0 });
       }
     }
 
     state.points = pts;
-    state.probePoint = null;
+    state.probePoint = isClassificationAlgo(state.algo) ? { x: 0, y: 0 } : null;
+    state.lastActionNote = '';
     resetAllModels();
     syncURL();
     recomputeAndRender();
@@ -278,13 +286,13 @@
   function createEmptyModels(seedOffset) {
     const rng = ML.createPRNG(state.seed + seedOffset);
     return {
-      linear: { w: 0, b: 0, r2: 0, mse: 0, rmse: 0, epoch: 0, lossHistory: [], valid: false },
-      logistic: ML.evalLogisticRegression(state.points, 0.4, -0.4, 0, 0, []),
-      svm: ML.evalLinearSVM(state.points, 0.5, -0.5, 0, 0, state.params.svmC, []),
+      linear: { w: 0, b: 0, r2: 0, mse: 0, rmse: 0, epoch: 0, lossHistory: [], diverged: false, valid: false },
+      logistic: ML.evalLogisticRegression(state.points, 0.4, -0.4, 0, 0, [], []),
+      svm: ML.evalLinearSVM(state.points, 0.5, -0.5, 0, 0, state.params.svmC, [], []),
       kmeans: ML.initKMeans(state.points, state.params.kmeansK, rng),
       tree: null,
       forest: { trees: [], accuracies: [] },
-      gb: { baseLogOdds: 0, stages: [], lr: state.params.gbLr, lossHistory: [], acc: 0 },
+      gb: { baseLogOdds: 0, stages: [], lr: state.params.gbLr, lossHistory: [], accHistory: [], acc: 0 },
       nn: ML.initNeuralNet(state.points, state.params.nnHidden, state.params.nnAct, rng),
       nb: {},
       pca: { valid: false, mx: 0, my: 0, pc1: [1, 0], pc2: [0, 1], var1: 0, var2: 0, ratio1: 0.5, ratio2: 0.5 }
@@ -324,10 +332,10 @@
     if (algo === 'linear_reg') {
       modelBag.linear = state.params.regSolver === 'ols'
         ? ML.fitLinearRegressionOLS(state.points)
-        : ML.evalLinearRegression(state.points, modelBag.linear.w, modelBag.linear.b, modelBag.linear.epoch, modelBag.linear.lossHistory);
+        : ML.evalLinearRegression(state.points, modelBag.linear.w, modelBag.linear.b, modelBag.linear.epoch, modelBag.linear.lossHistory, modelBag.linear.diverged);
     } else if (algo === 'logistic_reg') {
       modelBag.logistic = ML.evalLogisticRegression(
-        state.points, modelBag.logistic.w1, modelBag.logistic.w2, modelBag.logistic.b, modelBag.logistic.epoch, modelBag.logistic.lossHistory
+        state.points, modelBag.logistic.w1, modelBag.logistic.w2, modelBag.logistic.b, modelBag.logistic.epoch, modelBag.logistic.lossHistory, modelBag.logistic.accHistory
       );
     } else if (algo === 'kmeans') {
       modelBag.kmeans = modelBag.kmeans.centroids.length !== state.params.kmeansK
@@ -351,7 +359,7 @@
       }
     } else if (algo === 'svm') {
       modelBag.svm = ML.evalLinearSVM(
-        state.points, modelBag.svm.w1, modelBag.svm.w2, modelBag.svm.b, modelBag.svm.epoch, state.params.svmC, modelBag.svm.lossHistory
+        state.points, modelBag.svm.w1, modelBag.svm.w2, modelBag.svm.b, modelBag.svm.epoch, state.params.svmC, modelBag.svm.lossHistory, modelBag.svm.accHistory
       );
     } else if (algo === 'naive_bayes') {
       modelBag.nb = ML.fitGaussianNB(state.points);
@@ -372,7 +380,8 @@
     }
     drawAllCanvases();
     renderMetrics();
-    renderCurve();
+    renderNarration();
+    renderDynamicChart();
     renderInternals();
     renderProbeBanner();
   }
@@ -384,7 +393,8 @@
     }
     drawAllCanvases();
     renderMetrics();
-    renderCurve();
+    renderNarration();
+    renderDynamicChart();
     renderDataTable();
     renderInternals();
     renderProbeBanner();
@@ -411,7 +421,8 @@
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    ctx.fillStyle = '#ffffff';
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    ctx.fillStyle = isDark ? '#0f172a' : '#ffffff';
     ctx.fillRect(0, 0, w, h);
 
     drawDecisionRegions(ctx, w, h, algo, modelBag);
@@ -661,7 +672,7 @@
       if (algo === 'kmeans') {
         const cIdx = modelBag.kmeans.assignments[i];
         color = cIdx !== undefined ? CLASS_COLORS[cIdx % CLASS_COLORS.length] : '#64748b';
-      } else if (ALGO_META[algo].type === 'binary' || ALGO_META[algo].type === 'multiclass') {
+      } else if (isClassificationAlgo(algo)) {
         color = CLASS_COLORS[p.label % CLASS_COLORS.length];
       }
 
@@ -678,7 +689,7 @@
 
   function drawProbe(ctx, w, h, algo, modelBag) {
     const q = state.probePoint;
-    if (!q || state.points.length === 0) return;
+    if (!q || state.points.length === 0 || !isClassificationAlgo(algo)) return;
     const [qx, qy] = worldToCanvas(q.x, q.y, w, h);
     const modelObj = getActiveModelObj(algo, modelBag);
     const info = ML.explainProbe(algo, modelObj, state.points, state.params, q);
@@ -695,10 +706,21 @@
       ctx.restore();
     }
 
+    // Ringed draggable query marker
     ctx.save();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(qx, qy, 12, 0, Math.PI * 2);
+    ctx.stroke();
+
     ctx.fillStyle = CLASS_COLORS[info.label % CLASS_COLORS.length];
-    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.rect(qx - 7, qy - 7, 14, 14); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(qx, qy, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -716,68 +738,335 @@
     return null;
   }
 
-  // Live Loss / Metric Curve SVG (Borrowed from TensorFlow Playground, adapted across algorithms)
+  // Live Step Narration Bar
+  function renderNarration() {
+    const a = state.algo;
+    const el = els.stepNarration;
+    let text = '';
+    let isWarn = false;
+
+    if (state.points.length === 0) {
+      text = 'Canvas is empty — click anywhere on the canvas or pick a dataset preset to begin.';
+    } else if (a === 'neural_net' && state.models.nn) {
+      const n = state.models.nn;
+      if (n.diverged) {
+        isWarn = true;
+        text = `Epoch ${n.epoch} — Diverging! Learning rate (${state.params.lr}) is too large; loss is jumping (${n.loss.toFixed(2)}).`;
+      } else {
+        text = `Epoch ${n.epoch} — Cross-entropy loss ${n.loss.toFixed(3)}, accuracy ${(n.acc * 100).toFixed(1)}% (lr = ${state.params.lr}, ${n.hiddenSize} hidden neurons).`;
+      }
+    } else if (a === 'logistic_reg') {
+      const m = state.models.logistic;
+      if (m.diverged) {
+        isWarn = true;
+        text = `Epoch ${m.epoch} — Overshooting! Learning rate (${state.params.lr}) is too high for smooth convergence.`;
+      } else {
+        text = `Epoch ${m.epoch} — Log loss ${m.loss.toFixed(3)}, accuracy ${(m.acc * 100).toFixed(1)}% (lr = ${state.params.lr}).`;
+      }
+    } else if (a === 'svm') {
+      const m = state.models.svm;
+      if (m.diverged) {
+        isWarn = true;
+        text = `Epoch ${m.epoch} — Diverging! Step size (${state.params.lr}) is pushing the hyperplane erratically.`;
+      } else {
+        text = `Epoch ${m.epoch} — Margin width ${m.margin.toFixed(2)} with ${m.supportIndices.length} support vectors (C = ${state.params.svmC}).`;
+      }
+    } else if (a === 'linear_reg') {
+      const m = state.models.linear;
+      if (state.params.regSolver === 'gd') {
+        if (m.diverged) {
+          isWarn = true;
+          text = `Step ${m.epoch} — Diverged! Learning rate (${state.params.lr}) overshot the valley (MSE = ${m.mse.toFixed(1)}).`;
+        } else {
+          text = `Step ${m.epoch} — Gradient Descent MSE = ${m.mse.toFixed(3)}, R² = ${m.r2.toFixed(3)} (lr = ${state.params.lr}).`;
+        }
+      } else {
+        text = `Exact OLS fit: y = ${m.w.toFixed(2)}x ${m.b >= 0 ? '+' : '−'} ${Math.abs(m.b).toFixed(2)} (R² = ${m.r2.toFixed(3)}, RMSE = ${m.rmse.toFixed(3)}).`;
+      }
+    } else if (a === 'kmeans') {
+      const km = state.models.kmeans;
+      text = km.converged
+        ? `Step ${km.step} — Converged! Centroids stabilized with inertia ${km.inertia.toFixed(2)}.`
+        : `Step ${km.step} — Assigned ${state.points.length} points to ${km.centroids.length} centroids (inertia ${km.inertia.toFixed(2)}). Click Step or Train.`;
+    } else if (a === 'knn') {
+      text = `K = ${state.params.k} under ${state.params.metric} distance — drag the ringed query point to watch neighbor votes change live.`;
+    } else if (a === 'decision_tree') {
+      text = `CART tree fitted up to depth ${state.params.maxDepth} (min split = ${state.params.minSamples}).`;
+    } else if (a === 'random_forest') {
+      text = `Bagged ensemble of ${state.models.forest.trees.length} trees (max depth ${state.params.maxDepth}) combining majority votes.`;
+    } else if (a === 'gradient_boosting') {
+      const gb = state.models.gb;
+      const last = gb.lossHistory.length ? gb.lossHistory[gb.lossHistory.length - 1].toFixed(3) : '—';
+      text = `Fitted ${gb.stages.length} sequential residual trees (shrinkage = ${state.params.gbLr}, final loss = ${last}).`;
+    } else if (a === 'naive_bayes') {
+      text = `Estimated independent Gaussian distributions for ${Object.keys(state.models.nb).length} classes from ${state.points.length} points.`;
+    } else if (a === 'pca') {
+      const p = state.models.pca;
+      text = p.valid
+        ? `PC1 captures ${(p.ratio1 * 100).toFixed(1)}% of total variance; PC2 captures the remaining ${(p.ratio2 * 100).toFixed(1)}%.`
+        : 'Add at least 2 points to compute principal components.';
+    }
+
+    if (state.lastActionNote) {
+      text = `${state.lastActionNote} · ${text}`;
+    }
+    el.textContent = text;
+    el.classList.toggle('warning', isWarn);
+  }
+
+  // Dynamic Analysis Charts for All 11 Algorithms
   function getLossSeries(algo, modelBag) {
-    if (algo === 'linear_reg' && state.params.regSolver === 'gd') return { name: 'MSE', data: modelBag.linear.lossHistory || [] };
-    if (algo === 'logistic_reg') return { name: 'Log Loss', data: modelBag.logistic.lossHistory || [] };
-    if (algo === 'neural_net' && modelBag.nn) return { name: 'Cross-Entropy', data: modelBag.nn.lossHistory || [] };
-    if (algo === 'svm') return { name: 'Hinge + L2', data: modelBag.svm.lossHistory || [] };
-    if (algo === 'kmeans') return { name: 'Inertia', data: modelBag.kmeans.lossHistory || [] };
-    if (algo === 'gradient_boosting') return { name: 'Stage Log Loss', data: modelBag.gb.lossHistory || [] };
+    if (algo === 'linear_reg' && state.params.regSolver === 'gd') return { name: 'MSE', data: modelBag.linear.lossHistory || [], acc: null, diverged: modelBag.linear.diverged };
+    if (algo === 'logistic_reg') return { name: 'Log Loss', data: modelBag.logistic.lossHistory || [], acc: modelBag.logistic.accHistory || [], diverged: modelBag.logistic.diverged };
+    if (algo === 'neural_net' && modelBag.nn) return { name: 'Cross-Entropy', data: modelBag.nn.lossHistory || [], acc: modelBag.nn.accHistory || [], diverged: modelBag.nn.diverged };
+    if (algo === 'svm') return { name: 'Hinge + L2', data: modelBag.svm.lossHistory || [], acc: modelBag.svm.accHistory || [], diverged: modelBag.svm.diverged };
+    if (algo === 'kmeans') return { name: 'Inertia', data: modelBag.kmeans.lossHistory || [], acc: null, diverged: false };
+    if (algo === 'gradient_boosting') return { name: 'Stage Log Loss', data: modelBag.gb.lossHistory || [], acc: modelBag.gb.accHistory || [], diverged: false };
     return null;
   }
 
-  function renderCurve() {
-    const s1 = getLossSeries(state.algo, state.models);
-    const s2 = state.duelMode ? getLossSeries(state.duelAlgo, state.duelModels) : null;
-    const has1 = s1 && s1.data.length >= 2;
-    const has2 = s2 && s2.data.length >= 2;
-
-    if (!has1 && !has2) {
-      els.curveCard.classList.add('hidden');
+  function renderDynamicChart() {
+    if (state.points.length === 0) {
+      els.curveTitle.textContent = 'Dynamic Analysis';
+      els.curveLegend.textContent = '';
+      els.curveStage.innerHTML = '<div style="color:#475569;font-size:12px;padding:12px;text-align:center;">Add points or load a preset to view the live analysis chart.</div>';
+      els.curveHint.textContent = '';
       return;
     }
-    els.curveCard.classList.remove('hidden');
 
-    const W = 620, H = 130, PAD_L = 44, PAD_R = 14, PAD_T = 12, PAD_B = 22;
-    const allVals = [...(has1 ? s1.data : []), ...(has2 ? s2.data : [])];
-    const minV = Math.min(...allVals);
-    const maxV = Math.max(...allVals, minV + 1e-4);
-    const maxLen = Math.max(has1 ? s1.data.length : 0, has2 ? s2.data.length : 0, 2);
+    const a = state.algo;
+    const W = 620, H = 145, PAD_L = 46, PAD_R = 44, PAD_T = 14, PAD_B = 26;
 
-    const toPts = arr => arr.map((v, i) => {
-      const x = PAD_L + (i / (maxLen - 1)) * (W - PAD_L - PAD_R);
-      const y = PAD_T + (1 - (v - minV) / (maxV - minV)) * (H - PAD_T - PAD_B);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
+    // 1. Iterative & Boosting -> Live Loss + Accuracy (or Dual Loss in Duel Mode)
+    const s1 = getLossSeries(a, state.models);
+    if (s1) {
+      const s2 = state.duelMode ? getLossSeries(state.duelAlgo, state.duelModels) : null;
+      els.curveTitle.textContent = state.duelMode && s2
+        ? `Duel Training Curve (${s1.name} vs. ${s2.name})`
+        : `${s1.name}${s1.acc ? ' & Accuracy' : ''} Over Steps`;
 
-    const line1 = has1 ? `<polyline fill="none" stroke="#1d4ed8" stroke-width="2.2" points="${toPts(s1.data)}"/>` : '';
-    const line2 = has2 ? `<polyline fill="none" stroke="#D55E00" stroke-width="2.2" stroke-dasharray="5,3" points="${toPts(s2.data)}"/>` : '';
+      if (s1.data.length < 2 && (!s2 || s2.data.length < 2)) {
+        els.curveLegend.textContent = `${s1.name}: ${s1.data[0] !== undefined ? s1.data[0].toFixed(3) : '—'}`;
+        els.curveStage.innerHTML = '<div style="color:#475569;font-size:12px;padding:18px;text-align:center;">Click Train or Step to watch the live curve unfold.</div>';
+        els.curveHint.textContent = 'Lower loss is better. Try increasing Step Size (Learning Rate) to see how fast or unstable training becomes.';
+        return;
+      }
 
-    els.curveLegend.textContent = [
-      has1 ? `${ALGO_META[state.algo].name}: ${s1.data[s1.data.length - 1].toFixed(3)}` : '',
-      has2 ? `${ALGO_META[state.duelAlgo].name}: ${s2.data[s2.data.length - 1].toFixed(3)}` : ''
-    ].filter(Boolean).join('  |  ');
+      const vals = [...s1.data, ...(s2 && s2.data.length >= 2 ? s2.data : [])];
+      const minV = Math.min(...vals);
+      const maxV = Math.max(...vals, minV + 1e-4);
+      const maxLen = Math.max(s1.data.length, s2 ? s2.data.length : 0, 2);
 
-    els.curveStage.innerHTML = `
-      <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Training loss curve">
-        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
-        <line x1="${PAD_L}" y1="${H - PAD_B}" x2="${W - PAD_R}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
-        <text x="${PAD_L - 6}" y="${PAD_T + 8}" fill="#475569" font-size="10" text-anchor="end">${maxV.toFixed(2)}</text>
-        <text x="${PAD_L - 6}" y="${H - PAD_B}" fill="#475569" font-size="10" text-anchor="end">${minV.toFixed(2)}</text>
-        <text x="${W - PAD_R}" y="${H - 6}" fill="#475569" font-size="10" text-anchor="end">Step ${maxLen}</text>
-        ${line1}${line2}
-      </svg>
-    `;
+      const toLossPts = arr => arr.map((v, i) => {
+        const x = PAD_L + (i / (maxLen - 1)) * (W - PAD_L - PAD_R);
+        const y = PAD_T + (1 - (v - minV) / (maxV - minV)) * (H - PAD_T - PAD_B);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+
+      const toAccPts = arr => arr.map((v, i) => {
+        const x = PAD_L + (i / (maxLen - 1)) * (W - PAD_L - PAD_R);
+        const y = PAD_T + (1 - v) * (H - PAD_T - PAD_B);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+
+      const lossCol = s1.diverged ? '#b91c1c' : '#1d4ed8';
+      const line1 = `<polyline fill="none" stroke="${lossCol}" stroke-width="2.2" points="${toLossPts(s1.data)}"/>`;
+      let line2 = '';
+      let rightAxis = '';
+
+      if (state.duelMode && s2 && s2.data.length >= 2) {
+        line2 = `<polyline fill="none" stroke="#D55E00" stroke-width="2.2" stroke-dasharray="5,3" points="${toLossPts(s2.data)}"/>`;
+        els.curveLegend.textContent = `${ALGO_META[a].name}: ${s1.data[s1.data.length - 1].toFixed(3)}  |  ${ALGO_META[state.duelAlgo].name}: ${s2.data[s2.data.length - 1].toFixed(3)}`;
+      } else if (s1.acc && s1.acc.length >= 2) {
+        line2 = `<polyline fill="none" stroke="#009E73" stroke-width="2" stroke-dasharray="4,3" points="${toAccPts(s1.acc)}"/>`;
+        rightAxis = `
+          <text x="${W - PAD_R + 6}" y="${PAD_T + 8}" fill="#009E73" font-size="10">100%</text>
+          <text x="${W - PAD_R + 6}" y="${H - PAD_B}" fill="#009E73" font-size="10">0%</text>
+        `;
+        els.curveLegend.textContent = `Blue: ${s1.name} (${s1.data[s1.data.length - 1].toFixed(3)})  |  Green dashed: Accuracy (${(s1.acc[s1.acc.length - 1] * 100).toFixed(1)}%)`;
+      } else {
+        els.curveLegend.textContent = `${s1.name}: ${s1.data[s1.data.length - 1].toFixed(3)}`;
+      }
+
+      els.curveStage.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Training curve">
+          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="${PAD_L}" y1="${H - PAD_B}" x2="${W - PAD_R}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
+          <text x="${PAD_L - 6}" y="${PAD_T + 8}" fill="#475569" font-size="10" text-anchor="end">${maxV.toFixed(2)}</text>
+          <text x="${PAD_L - 6}" y="${H - PAD_B}" fill="#475569" font-size="10" text-anchor="end">${minV.toFixed(2)}</text>
+          <text x="${W - PAD_R}" y="${H - 6}" fill="#475569" font-size="10" text-anchor="end">Step ${maxLen}</text>
+          ${rightAxis}${line1}${line2}
+        </svg>
+      `;
+      els.curveHint.textContent = s1.diverged
+        ? 'Warning: Loss is climbing! Lower the Step Size (Learning Rate) or click Reset Defaults.'
+        : 'Lower loss means predictions match the labels better; dashed green tracks accuracy from 0% to 100%.';
+      return;
+    }
+
+    // 2. Parameter-Sweep Models (KNN, Decision Tree, Random Forest)
+    if (a === 'knn' || a === 'decision_tree' || a === 'random_forest') {
+      let sweep = [];
+      let currentVal = 1;
+      let paramLabel = '';
+      if (a === 'knn') {
+        sweep = ML.sweepKNN(state.points, Math.min(15, Math.max(2, state.points.length - 1)), state.params.metric);
+        currentVal = Math.min(state.params.k, sweep.length ? sweep[sweep.length - 1].param : 1);
+        paramLabel = 'K';
+        els.curveTitle.textContent = 'Leave-One-Out Accuracy vs. Neighbors (K)';
+      } else if (a === 'decision_tree') {
+        sweep = ML.sweepDecisionTree(state.points, state.params.minSamples);
+        currentVal = state.params.maxDepth;
+        paramLabel = 'Depth';
+        els.curveTitle.textContent = 'Accuracy vs. Tree Max Depth';
+      } else {
+        sweep = ML.sweepRandomForest(state.points, state.params.numTrees, state.params.minSamples, state.seed);
+        currentVal = state.params.maxDepth;
+        paramLabel = 'Depth';
+        els.curveTitle.textContent = 'Ensemble Accuracy vs. Tree Max Depth';
+      }
+
+      if (sweep.length === 0) return;
+      const maxIdx = Math.max(1, sweep.length - 1);
+      const pts = sweep.map((d, i) => {
+        const x = PAD_L + (i / maxIdx) * (W - PAD_L - PAD_R);
+        const y = PAD_T + (1 - d.acc) * (H - PAD_T - PAD_B);
+        return { ...d, x, y };
+      });
+      const poly = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+      const activePt = pts.find(p => p.param === currentVal) || pts[0];
+      const bestPt = pts.reduce((best, p) => (p.acc > best.acc ? p : best), pts[0]);
+
+      els.curveLegend.textContent = `Current ${paramLabel}=${activePt.param}: ${(activePt.acc * 100).toFixed(1)}%  |  Best ${paramLabel}=${bestPt.param}: ${(bestPt.acc * 100).toFixed(1)}%`;
+
+      const dotsSvg = pts.map(p => {
+        const isCur = p.param === activePt.param;
+        return `
+          ${isCur ? `<line x1="${p.x.toFixed(1)}" y1="${PAD_T}" x2="${p.x.toFixed(1)}" y2="${H - PAD_B}" stroke="#1d4ed8" stroke-width="1.2" stroke-dasharray="3,3"/>` : ''}
+          <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isCur ? 5 : 3}" fill="${isCur ? '#1d4ed8' : '#ffffff'}" stroke="#1d4ed8" stroke-width="1.8"/>
+          <text x="${p.x.toFixed(1)}" y="${H - 6}" fill="${isCur ? '#1d4ed8' : '#475569'}" font-size="10" font-weight="${isCur ? 700 : 400}" text-anchor="middle">${p.param}</text>
+        `;
+      }).join('');
+
+      els.curveStage.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Parameter sweep accuracy chart">
+          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="${PAD_L}" y1="${H - PAD_B}" x2="${W - PAD_R}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
+          <text x="${PAD_L - 6}" y="${PAD_T + 8}" fill="#475569" font-size="10" text-anchor="end">100%</text>
+          <text x="${PAD_L - 6}" y="${(PAD_T + H - PAD_B) / 2 + 3}" fill="#475569" font-size="10" text-anchor="end">50%</text>
+          <text x="${PAD_L - 6}" y="${H - PAD_B}" fill="#475569" font-size="10" text-anchor="end">0%</text>
+          <polyline fill="none" stroke="#1d4ed8" stroke-width="2" points="${poly}"/>
+          ${dotsSvg}
+        </svg>
+      `;
+      els.curveHint.textContent = a === 'knn'
+        ? `Blue marker shows your current K=${activePt.param}. Highest leave-one-out accuracy on this sample is at K=${bestPt.param}.`
+        : `Blue marker shows your current Depth=${activePt.param}. Drag Spread (Noise) higher to see shallow vs. deep trees trade off.`;
+      return;
+    }
+
+    // 3. One-Shot Statistical Models (PCA, OLS Linear Regression, Naive Bayes)
+    if (a === 'pca') {
+      const p = state.models.pca;
+      els.curveTitle.textContent = 'Variance Captured by Each Principal Component';
+      els.curveLegend.textContent = p.valid ? `PC1: ${(p.ratio1 * 100).toFixed(1)}%  |  PC2: ${(p.ratio2 * 100).toFixed(1)}%` : '';
+      const barMaxW = W - 150;
+      const w1 = Math.max(4, p.ratio1 * barMaxW);
+      const w2 = Math.max(4, p.ratio2 * barMaxW);
+      els.curveStage.innerHTML = `
+        <svg viewBox="0 0 ${W} 104" width="${W}" height="104" aria-label="PCA explained variance chart">
+          <text x="12" y="34" fill="#0f172a" font-size="12" font-weight="700">PC1</text>
+          <rect x="54" y="18" width="${barMaxW}" height="24" rx="4" fill="#e2e8f0"/>
+          <rect x="54" y="18" width="${w1.toFixed(1)}" height="24" rx="4" fill="#0072B2"/>
+          <text x="${(54 + barMaxW + 10)}" y="34" fill="#0f172a" font-size="12" font-weight="700">${(p.ratio1 * 100).toFixed(1)}%</text>
+
+          <text x="12" y="76" fill="#0f172a" font-size="12" font-weight="700">PC2</text>
+          <rect x="54" y="60" width="${barMaxW}" height="24" rx="4" fill="#e2e8f0"/>
+          <rect x="54" y="60" width="${w2.toFixed(1)}" height="24" rx="4" fill="#D55E00"/>
+          <text x="${(54 + barMaxW + 10)}" y="76" fill="#0f172a" font-size="12" font-weight="700">${(p.ratio2 * 100).toFixed(1)}%</text>
+        </svg>
+      `;
+      els.curveHint.textContent = 'When points lie along a tight diagonal, PC1 captures over 90% of the information; circular clouds split ~50% / 50%.';
+      return;
+    }
+
+    if (a === 'linear_reg') {
+      const residuals = ML.getOLSResiduals(state.points, state.models.linear);
+      els.curveTitle.textContent = 'Residual Errors per Point (Actual y − Predicted ŷ)';
+      const maxAbs = Math.max(0.5, ...residuals.map(r => Math.abs(r.residual)));
+      els.curveLegend.textContent = `RMSE: ${state.models.linear.rmse.toFixed(3)}  |  Max |Error|: ${maxAbs.toFixed(2)}`;
+      const midY = (PAD_T + H - PAD_B) / 2;
+      const halfH = (H - PAD_T - PAD_B) / 2;
+      const slotW = (W - PAD_L - PAD_R) / Math.max(1, residuals.length);
+      const barW = Math.max(3, slotW - 2);
+      const bars = residuals.map((r, i) => {
+        const x = PAD_L + i * slotW + 1;
+        const bh = (Math.abs(r.residual) / maxAbs) * halfH;
+        const y = r.residual >= 0 ? midY - bh : midY;
+        const col = r.residual >= 0 ? '#0072B2' : '#D55E00';
+        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1.5, bh).toFixed(1)}" fill="${col}"/>`;
+      }).join('');
+
+      els.curveStage.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="OLS residual error chart">
+          <line x1="${PAD_L}" y1="${midY}" x2="${W - PAD_R}" y2="${midY}" stroke="#94a3b8" stroke-width="1.2"/>
+          <text x="${PAD_L - 6}" y="${PAD_T + 8}" fill="#475569" font-size="10" text-anchor="end">+${maxAbs.toFixed(1)}</text>
+          <text x="${PAD_L - 6}" y="${midY + 3}" fill="#475569" font-size="10" text-anchor="end">0</text>
+          <text x="${PAD_L - 6}" y="${H - PAD_B}" fill="#475569" font-size="10" text-anchor="end">−${maxAbs.toFixed(1)}</text>
+          <text x="${W - PAD_R}" y="${H - 6}" fill="#475569" font-size="10" text-anchor="end">Points sorted left → right by X</text>
+          ${bars}
+        </svg>
+      `;
+      els.curveHint.textContent = 'Blue bars sit above the line; orange bars sit below. Ordinary Least Squares balances squared errors across all points.';
+      return;
+    }
+
+    if (a === 'naive_bayes') {
+      const stats = Object.values(state.models.nb);
+      els.curveTitle.textContent = 'Class Gaussian Distributions Along X Axis';
+      if (stats.length === 0) return;
+      const xs = Array.from({ length: 81 }, (_, i) => -5 + (10 * i) / 80);
+      let maxPdf = 0.01;
+      const curves = stats.map(s => {
+        const vals = xs.map(x => {
+          const pdf = (1 / Math.sqrt(2 * Math.PI * s.vx)) * Math.exp(-((x - s.mx) ** 2) / (2 * s.vx));
+          if (pdf > maxPdf) maxPdf = pdf;
+          return pdf;
+        });
+        return { label: s.label, mx: s.mx, vals };
+      });
+      els.curveLegend.textContent = stats.map(s => `Class ${s.label}: μx=${s.mx.toFixed(1)}, σx=${Math.sqrt(s.vx).toFixed(1)}`).join('  |  ');
+
+      const paths = curves.map(c => {
+        const col = CLASS_COLORS[c.label % CLASS_COLORS.length];
+        const pts = c.vals.map((v, i) => {
+          const px = PAD_L + (i / (xs.length - 1)) * (W - PAD_L - PAD_R);
+          const py = PAD_T + (1 - v / maxPdf) * (H - PAD_T - PAD_B);
+          return `${px.toFixed(1)},${py.toFixed(1)}`;
+        }).join(' ');
+        return `<polyline fill="none" stroke="${col}" stroke-width="2.2" points="${pts}"/>`;
+      }).join('');
+
+      els.curveStage.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Naive Bayes 1D Gaussian curves">
+          <line x1="${PAD_L}" y1="${H - PAD_B}" x2="${W - PAD_R}" y2="${H - PAD_B}" stroke="#cbd5e1" stroke-width="1"/>
+          <text x="${PAD_L}" y="${H - 6}" fill="#475569" font-size="10">-5</text>
+          <text x="${(PAD_L + W - PAD_R) / 2}" y="${H - 6}" fill="#475569" font-size="10" text-anchor="middle">x = 0</text>
+          <text x="${W - PAD_R}" y="${H - 6}" fill="#475569" font-size="10" text-anchor="end">+5</text>
+          ${paths}
+        </svg>
+      `;
+      els.curveHint.textContent = 'Where bell curves overlap, Naive Bayes becomes less certain and misclassifications rise.';
+    }
   }
 
   function renderProbeBanner() {
-    if (!state.probePoint || state.points.length === 0) {
+    if (!state.probePoint || state.points.length === 0 || !isClassificationAlgo(state.algo)) {
       els.probeBanner.classList.add('hidden');
       return;
     }
     const p1 = ML.explainProbe(state.algo, getActiveModelObj(state.algo, state.models), state.points, state.params, state.probePoint);
-    const p2 = state.duelMode
+    const p2 = state.duelMode && isClassificationAlgo(state.duelAlgo)
       ? ML.explainProbe(state.duelAlgo, getActiveModelObj(state.duelAlgo, state.duelModels), state.points, state.params, state.probePoint)
       : null;
     if (!p1 && !p2) {
@@ -976,10 +1265,12 @@
     els.algoTitle.textContent = state.duelMode
       ? `${meta.name} vs. ${ALGO_META[state.duelAlgo].name}`
       : meta.name;
-    els.algoBadge.textContent = meta.badge;
     els.algoIntuition.textContent = meta.intuition;
     els.whatToNotice.textContent = meta.notice;
     els.seedBadge.textContent = String(state.seed);
+    els.canvasHintText.textContent = isClassificationAlgo(state.algo)
+      ? 'Drag the ringed query point · Click to add points · Right-click to erase'
+      : 'Click to add points · Right-click to erase nearest point · Range [-5, 5]';
 
     els.duelToggleBtn.setAttribute('aria-pressed', state.duelMode ? 'true' : 'false');
     els.duelToggleBtn.classList.toggle('active', state.duelMode);
@@ -1000,7 +1291,7 @@
   function renderToolbar() {
     const meta = ALGO_META[state.algo];
     let classPills = '';
-    if (meta.type === 'binary' || meta.type === 'multiclass') {
+    if (isClassificationAlgo(state.algo)) {
       const maxC = meta.type === 'binary' ? 2 : 3;
       for (let c = 0; c < maxC; c++) {
         classPills += `<button class="class-pill ${state.activeLabel === c && state.mode === 'add' ? 'active' : ''}" type="button" data-class="${c}">
@@ -1009,23 +1300,24 @@
       }
     }
 
-    const canProbe = meta.type === 'binary' || meta.type === 'multiclass';
     const showStep = isIterativeAlgo(state.algo) || (state.duelMode && isIterativeAlgo(state.duelAlgo));
 
     els.toolbar.innerHTML = `
       <div class="toolbar-group">
         ${classPills}
-        ${meta.type === 'regression' || meta.type === 'unlabeled' ? `<button class="class-pill ${state.mode === 'add' ? 'active' : ''}" type="button" id="modeAddBtn"><span class="dot" style="background:#1d4ed8"></span> Add Point</button>` : ''}
+        ${!isClassificationAlgo(state.algo) ? `<button class="class-pill ${state.mode === 'add' ? 'active' : ''}" type="button" id="modeAddBtn"><span class="dot" style="background:#1d4ed8"></span> Add Point</button>` : ''}
         <button class="btn btn-sm ${state.mode === 'erase' ? 'active' : ''}" type="button" id="modeEraseBtn">Eraser</button>
-        ${canProbe ? `<button class="btn btn-sm ${state.mode === 'probe' ? 'active' : ''}" type="button" id="modeProbeBtn">Test Query</button>` : ''}
       </div>
       <div class="toolbar-group">
         ${showStep ? `
           <button class="btn btn-sm btn-primary" type="button" id="runToggleBtn">${state.running ? 'Pause' : 'Train'}</button>
           <button class="btn btn-sm" type="button" id="stepBtn">Step</button>
-          <button class="btn btn-sm" type="button" id="resetModelBtn">Reset Model</button>
+          <div class="speed-group" role="group" aria-label="Playback speed">
+            ${[0.5, 1, 2].map(sp => `<button class="speed-btn ${state.playbackSpeed === sp ? 'active' : ''}" type="button" data-speed="${sp}">${sp}×</button>`).join('')}
+          </div>
+          <button class="btn btn-sm" type="button" id="resetModelBtn">Reset</button>
         ` : ''}
-        <button class="btn btn-sm btn-danger" type="button" id="clearPtsBtn">Clear Points</button>
+        <button class="btn btn-sm btn-danger" type="button" id="clearPtsBtn">Clear</button>
       </div>
     `;
 
@@ -1045,35 +1337,30 @@
       renderToolbar();
     });
 
-    const probeBtn = $('modeProbeBtn');
-    if (probeBtn) {
-      probeBtn.addEventListener('click', () => {
-        state.mode = state.mode === 'probe' ? 'add' : 'probe';
-        renderToolbar();
-      });
-    }
-
     const runBtn = $('runToggleBtn');
     if (runBtn) {
       runBtn.addEventListener('click', () => {
-        if (state.running) {
-          stopAnimation();
-        } else {
-          state.running = true;
-          updateRunButtons();
-          const interval = prefersReducedMotion() ? 220 : (state.algo === 'kmeans' ? 420 : 60);
-          state.timerId = setInterval(stepCurrentModels, interval);
-        }
+        if (state.running) stopAnimation();
+        else startAnimation();
       });
     }
 
     const stepBtn = $('stepBtn');
     if (stepBtn) stepBtn.addEventListener('click', stepCurrentModels);
 
+    els.toolbar.querySelectorAll('[data-speed]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.playbackSpeed = Number(btn.dataset.speed);
+        if (state.running) startAnimation();
+        renderToolbar();
+      });
+    });
+
     const resetBtn = $('resetModelBtn');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         stopAnimation();
+        state.lastActionNote = '';
         resetAllModels();
         recomputeAndRender();
       });
@@ -1083,6 +1370,7 @@
       stopAnimation();
       state.points = [];
       state.probePoint = null;
+      state.lastActionNote = '';
       resetAllModels();
       recomputeAndRender();
     });
@@ -1093,13 +1381,10 @@
     if (runBtn) runBtn.textContent = state.running ? 'Pause' : 'Train';
   }
 
-  function renderControls() {
-    const activeAlgos = state.duelMode ? [state.algo, state.duelAlgo] : [state.algo];
-    const has = id => activeAlgos.includes(id);
-
-    let html = `
+  function renderDataControls() {
+    els.dataControlsBox.innerHTML = `
       <div class="control-row">
-        <label class="control-label" for="presetSelect"><span>Dataset Preset</span></label>
+        <label class="control-label" for="presetSelect"><span>Dataset Shape</span></label>
         <select id="presetSelect">
           <option value="linear" ${state.preset === 'linear' ? 'selected' : ''}>Linear + Noise</option>
           <option value="separable" ${state.preset === 'separable' ? 'selected' : ''}>Linearly Separable (2 Classes)</option>
@@ -1109,7 +1394,24 @@
           <option value="correlated" ${state.preset === 'correlated' ? 'selected' : ''}>Correlated Ellipse</option>
         </select>
       </div>
+      <div class="control-row">
+        <label class="control-label" for="spreadSlider"><span>Spread (Noise)</span><span class="control-val" id="spreadVal">${state.params.spread.toFixed(1)}×</span></label>
+        <input type="range" id="spreadSlider" min="0.2" max="2.5" step="0.1" value="${state.params.spread}">
+      </div>
     `;
+
+    $('presetSelect').addEventListener('change', e => loadPreset(e.target.value));
+    $('spreadSlider').addEventListener('input', e => {
+      state.params.spread = Number(e.target.value);
+      $('spreadVal').textContent = `${state.params.spread.toFixed(1)}×`;
+      loadPreset(state.preset);
+    });
+  }
+
+  function renderModelControls() {
+    const activeAlgos = state.duelMode ? [state.algo, state.duelAlgo] : [state.algo];
+    const has = id => activeAlgos.includes(id);
+    let html = '';
 
     if (has('linear_reg')) {
       html += `
@@ -1134,7 +1436,7 @@
       html += `
         <div class="control-row">
           <label class="control-label" for="lrSlider"><span>Step Size (Learning Rate)</span><span class="control-val" id="lrVal">${state.params.lr}</span></label>
-          <input type="range" id="lrSlider" min="0.01" max="0.4" step="0.01" value="${state.params.lr}">
+          <input type="range" id="lrSlider" min="0.01" max="2.5" step="0.01" value="${state.params.lr}">
         </div>
       `;
     }
@@ -1157,10 +1459,11 @@
     }
 
     if (has('knn')) {
+      const maxK = Math.max(15, state.points.length);
       html += `
         <div class="control-row">
-          <label class="control-label" for="kSlider"><span>Neighbors to Check (K)</span><span class="control-val" id="kVal">${state.params.k}</span></label>
-          <input type="range" id="kSlider" min="1" max="15" step="1" value="${state.params.k}">
+          <label class="control-label" for="kSlider"><span>Neighbors (K)</span><span class="control-val" id="kVal">${state.params.k}</span></label>
+          <input type="range" id="kSlider" min="1" max="${maxK}" step="1" value="${state.params.k}">
         </div>
         <div class="control-row">
           <label class="control-label" for="metricSelect"><span>Distance Formula</span></label>
@@ -1240,11 +1543,14 @@
       `;
     }
 
-    els.controlsBox.innerHTML = html;
+    if (!html) {
+      html = '<div style="font-size:12px;color:#475569;">No extra model parameters — adjust Spread or click points to test how class means and variances shift.</div>';
+    }
 
-    $('presetSelect').addEventListener('change', e => loadPreset(e.target.value));
+    els.modelControlsBox.innerHTML = html;
+
     const regSolver = $('regSolverSelect');
-    if (regSolver) regSolver.addEventListener('change', e => { stopAnimation(); state.params.regSolver = e.target.value; renderToolbar(); renderControls(); recomputeAndRender(); });
+    if (regSolver) regSolver.addEventListener('change', e => { stopAnimation(); state.params.regSolver = e.target.value; renderToolbar(); renderModelControls(); recomputeAndRender(); });
     const showRes = $('showResidualsSelect');
     if (showRes) showRes.addEventListener('change', e => { state.params.showResiduals = e.target.value === '1'; drawAllCanvases(); });
     const lrSlider = $('lrSlider');
@@ -1276,8 +1582,137 @@
     const showProj = $('showProjSelect');
     if (showProj) showProj.addEventListener('change', e => { state.params.showProjections = e.target.value === '1'; drawAllCanvases(); });
 
-    const needsLabel = ALGO_META[state.algo].type === 'binary' || ALGO_META[state.algo].type === 'multiclass';
-    els.inputLabelWrap.style.display = needsLabel ? 'block' : 'none';
+    els.inputLabelWrap.style.display = isClassificationAlgo(state.algo) ? 'block' : 'none';
+  }
+
+  function getBreakItPresets(algo) {
+    if (algo === 'neural_net') return [
+      { label: 'Crank Learning Rate to 2.4 (Diverge)', run: () => { state.params.lr = 2.4; state.lastActionNote = 'Break It: Huge learning rate'; renderModelControls(); startAnimation(); } },
+      { label: 'Shrink to 2 Hidden Neurons (Underfit)', run: () => { state.params.nnHidden = 2; state.lastActionNote = 'Break It: Too few hidden neurons'; renderModelControls(); resetAllModels(); recomputeAndRender(); } }
+    ];
+    if (algo === 'logistic_reg') return [
+      { label: 'Load XOR Dataset (Straight Line Fails)', run: () => { state.lastActionNote = 'Break It: XOR cannot be split by 1 straight line'; loadPreset('xor'); renderDataControls(); } },
+      { label: 'Crank Learning Rate to 2.4 (Oscillate)', run: () => { state.params.lr = 2.4; state.lastActionNote = 'Break It: Huge learning rate'; renderModelControls(); startAnimation(); } }
+    ];
+    if (algo === 'svm') return [
+      { label: 'Load XOR Dataset (Linear Margin Fails)', run: () => { state.lastActionNote = 'Break It: XOR has no linear separating margin'; loadPreset('xor'); renderDataControls(); } },
+      { label: 'Crank Learning Rate to 2.4 (Unstable)', run: () => { state.params.lr = 2.4; state.lastActionNote = 'Break It: Huge learning rate'; renderModelControls(); startAnimation(); } }
+    ];
+    if (algo === 'linear_reg') return [
+      { label: 'Huge Learning Rate in GD (Diverge)', run: () => { state.params.regSolver = 'gd'; state.params.lr = 0.55; state.lastActionNote = 'Break It: GD learning rate too high'; renderToolbar(); renderModelControls(); resetAllModels(); recomputeAndRender(); startAnimation(); } },
+      { label: 'Drop Extreme Outlier at (-4.5, 4.5)', run: () => { state.points.push({ x: -4.5, y: 4.5, label: 0 }); state.lastActionNote = 'Break It: Single outlier pulls the whole OLS line'; recomputeAndRender(); } }
+    ];
+    if (algo === 'knn') return [
+      { label: 'Set K = All Points (Global Majority Only)', run: () => { state.params.k = Math.max(1, state.points.length); state.lastActionNote = 'Break It: K = N ignores all local structure'; renderModelControls(); recomputeAndRender(); } },
+      { label: 'Set K = 1 + High Noise (Overfit)', run: () => { state.params.k = 1; state.params.spread = 2.0; state.lastActionNote = 'Break It: K = 1 memorizes noisy outliers'; loadPreset(state.preset); renderDataControls(); renderModelControls(); } }
+    ];
+    if (algo === 'decision_tree') return [
+      { label: 'Set Max Depth = 1 (Single Cut Underfit)', run: () => { state.params.maxDepth = 1; state.lastActionNote = 'Break It: Depth 1 can only make one straight cut'; renderModelControls(); recomputeAndRender(); } },
+      { label: 'High Noise + Depth 4 (Fragmented Boxes)', run: () => { state.params.maxDepth = 4; state.params.spread = 2.1; state.lastActionNote = 'Break It: Deep tree chases noisy points'; loadPreset(state.preset); renderDataControls(); renderModelControls(); } }
+    ];
+    if (algo === 'random_forest') return [
+      { label: 'Set Max Depth = 1 (Shallow Stumps)', run: () => { state.params.maxDepth = 1; state.lastActionNote = 'Break It: Depth 1 stumps underfit'; renderModelControls(); recomputeAndRender(); } },
+      { label: 'High Noise Spread (2.2× Overlap)', run: () => { state.params.spread = 2.2; state.lastActionNote = 'Break It: Heavy class overlap'; loadPreset(state.preset); renderDataControls(); } }
+    ];
+    if (algo === 'gradient_boosting') return [
+      { label: 'Use Only 1 Boosting Round (Underfit)', run: () => { state.params.gbStages = 1; state.lastActionNote = 'Break It: 1 weak tree cannot bend around moons'; renderModelControls(); recomputeAndRender(); } },
+      { label: 'Max Shrinkage = 1.0 + High Noise', run: () => { state.params.gbLr = 1.0; state.params.spread = 2.0; state.lastActionNote = 'Break It: Aggressive shrinkage fits noise'; loadPreset(state.preset); renderDataControls(); renderModelControls(); } }
+    ];
+    if (algo === 'naive_bayes') return [
+      { label: 'Load XOR (Identical Class Means)', run: () => { state.lastActionNote = 'Break It: Both classes share the same center in XOR'; loadPreset('xor'); renderDataControls(); } },
+      { label: 'High Noise Spread (2.2× Bell Overlap)', run: () => { state.params.spread = 2.2; state.lastActionNote = 'Break It: Overlapping Gaussians'; loadPreset(state.preset); renderDataControls(); } }
+    ];
+    if (algo === 'kmeans') return [
+      { label: 'Load Two Moons (Spherical Clusters Fail)', run: () => { state.params.kmeansK = 2; state.lastActionNote = 'Break It: K-Means cuts moons linearly instead of by shape'; loadPreset('moons'); renderDataControls(); renderModelControls(); } },
+      { label: 'Too Many Clusters (K = 6)', run: () => { state.params.kmeansK = 6; state.lastActionNote = 'Break It: Over-splitting 3 blobs into 6 clusters'; renderModelControls(); resetAllModels(); recomputeAndRender(); } }
+    ];
+    if (algo === 'pca') return [
+      { label: 'High Spread (Circular Cloud → ~50/50)', run: () => { state.params.spread = 2.5; state.lastActionNote = 'Break It: Circular cloud has no dominant axis'; loadPreset('correlated'); renderDataControls(); } },
+      { label: 'Add Extreme Outlier at (-4.6, 4.6)', run: () => { state.points.push({ x: -4.6, y: 4.6, label: 0 }); state.lastActionNote = 'Break It: Outlier rotates PC1'; recomputeAndRender(); } }
+    ];
+    return [];
+  }
+
+  
+  function showBreakItBanner(title, desc) {
+    const banner = document.getElementById('breakItBanner');
+    if (!banner) return;
+    banner.innerHTML = `
+      <div class="break-banner-text">
+        <strong>Failure Mode Active: ${title}</strong>
+        <span>${desc}</span>
+      </div>
+      <div class="break-banner-actions">
+        <button type="button" class="btn btn-sm" id="breakBannerResetBtn">Reset</button>
+        <button type="button" class="btn btn-sm" id="breakBannerDismissBtn">Dismiss</button>
+      </div>
+    `;
+    banner.classList.remove('hidden');
+    const resetB = document.getElementById('breakBannerResetBtn');
+    const dismissB = document.getElementById('breakBannerDismissBtn');
+    if (dismissB) dismissB.addEventListener('click', () => banner.classList.add('hidden'));
+    if (resetB) resetB.addEventListener('click', () => {
+      banner.classList.add('hidden');
+      const mainReset = document.getElementById('resetDefaultsBtn');
+      if (mainReset) mainReset.click();
+    });
+  }
+
+  function hideBreakItBanner() {
+    const banner = document.getElementById('breakItBanner');
+    if (banner) banner.classList.add('hidden');
+  }
+
+  function renderStudioPathNav(studioId) {
+    const host = document.getElementById('studioPathNav');
+    if (!host || !window.MLCatalog) return;
+    const item = window.MLCatalog.getByStudioId(studioId);
+    if (!item) { host.classList.add('hidden'); return; }
+    const renderLinks = (ids, arrow) => ids.map((id) => {
+      const target = window.MLCatalog.getById(id);
+      if (!target) return '';
+      if (target.live && target.studioId) {
+        return `<button type="button" class="studio-nav-chip live" data-jump-studio="${target.studioId}">${arrow} ${target.title}</button>`;
+      }
+      return `<button type="button" class="studio-nav-chip soon" data-jump-gallery="${target.category}">${arrow} ${target.title} <em>(Soon)</em></button>`;
+    }).filter(Boolean).join('');
+
+    const prereqHtml = renderLinks(item.prerequisites || [], '&larr;');
+    const nextHtml = renderLinks(item.next || [], '&rarr;');
+    if (!prereqHtml && !nextHtml) { host.classList.add('hidden'); return; }
+
+    host.classList.remove('hidden');
+    host.innerHTML = `
+      <div class="studio-path-col">
+        <span class="studio-path-label">Prerequisites</span>
+        <div class="studio-path-chips">${prereqHtml || '<span class="studio-path-none">Great starting point!</span>'}</div>
+      </div>
+      <div class="studio-path-col">
+        <span class="studio-path-label">What&rsquo;s Next</span>
+        <div class="studio-path-chips">${nextHtml || '<span class="studio-path-none">Explore Duel Mode or Gallery</span>'}</div>
+      </div>
+    `;
+    host.querySelectorAll('[data-jump-studio]').forEach((b) => {
+      b.addEventListener('click', () => selectAlgo(b.getAttribute('data-jump-studio')));
+    });
+    host.querySelectorAll('[data-jump-gallery]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (window.MLPortal) window.MLPortal.openGalleryWithFilter(b.getAttribute('data-jump-gallery'));
+      });
+    });
+  }
+
+  function renderBreakItControls() {
+    const presets = getBreakItPresets(state.algo);
+    els.breakItBox.innerHTML = presets.map((p, idx) => `
+      <button class="btn break-btn" type="button" data-break-idx="${idx}">${p.label}</button>
+    `).join('');
+    els.breakItBox.querySelectorAll('[data-break-idx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.breakIdx);
+        if (presets[idx]) presets[idx].run();
+      });
+    });
   }
 
   function summarizeHeadlineMetric(algo, modelBag) {
@@ -1350,7 +1785,7 @@
       const gb = state.models.gb;
       const lastLoss = gb.lossHistory.length ? gb.lossHistory[gb.lossHistory.length - 1] : 0;
       cards.push({ label: 'Accuracy', value: `${(gb.acc * 100).toFixed(1)}%` });
-      cards.push({ label: 'Stages', value: gb.stages.length });
+      cards.push({ label: 'Rounds', value: gb.stages.length });
       cards.push({ label: 'Final Loss', value: lastLoss.toFixed(3) });
     } else if (a === 'svm') {
       const m = state.models.svm;
@@ -1378,7 +1813,7 @@
   }
 
   function renderDataTable() {
-    const showLbl = ALGO_META[state.algo].type === 'binary' || ALGO_META[state.algo].type === 'multiclass';
+    const showLbl = isClassificationAlgo(state.algo);
     els.dataCount.textContent = `${state.points.length} pts`;
     els.dataTableBody.innerHTML = state.points.map((p, idx) => `
       <tr>
@@ -1397,7 +1832,21 @@
     });
   }
 
+  // Draggable Query Point + Click to Add/Erase
+  function isNearProbe(canvas, e) {
+    if (!state.probePoint || !isClassificationAlgo(state.algo)) return false;
+    const rect = canvas.getBoundingClientRect();
+    const [qx, qy] = worldToCanvas(state.probePoint.x, state.probePoint.y, rect.width, rect.height);
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    return Math.hypot(mx - qx, my - qy) <= 16;
+  }
+
   function handleCanvasClick(canvas, e) {
+    if (state.didDragProbe) {
+      state.didDragProbe = false;
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const pt = canvasToWorld(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
     if (e.button === 2 || state.mode === 'erase') {
@@ -1409,47 +1858,69 @@
       if (bestIdx !== -1) { state.points.splice(bestIdx, 1); recomputeAndRender(); }
       return;
     }
-    if (state.mode === 'probe') {
-      state.probePoint = pt;
-      drawAllCanvases();
-      renderProbeBanner();
-      return;
-    }
     state.points.push({ x: pt.x, y: pt.y, label: state.activeLabel });
     recomputeAndRender();
   }
 
   function attachCanvasEvents(canvas) {
+    canvas.addEventListener('pointerdown', e => {
+      if (e.button === 0 && isNearProbe(canvas, e)) {
+        state.draggingProbe = true;
+        state.didDragProbe = true;
+        canvas.classList.add('dragging');
+        if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+      }
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const pt = canvasToWorld(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+      els.coordReadout.textContent = `x: ${pt.x.toFixed(2)}, y: ${pt.y.toFixed(2)}`;
+
+      if (state.draggingProbe) {
+        state.probePoint = pt;
+        drawAllCanvases();
+        renderProbeBanner();
+      } else {
+        canvas.classList.toggle('can-grab', isNearProbe(canvas, e));
+      }
+    });
+
+    const endDrag = () => {
+      if (state.draggingProbe) {
+        state.draggingProbe = false;
+        canvas.classList.remove('dragging');
+      }
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+
     canvas.addEventListener('click', e => handleCanvasClick(canvas, e));
     canvas.addEventListener('contextmenu', e => {
       e.preventDefault();
       handleCanvasClick(canvas, { ...e, button: 2, clientX: e.clientX, clientY: e.clientY });
-    });
-    canvas.addEventListener('mousemove', e => {
-      const rect = canvas.getBoundingClientRect();
-      const pt = canvasToWorld(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
-      els.coordReadout.textContent = `x: ${pt.x.toFixed(2)}, y: ${pt.y.toFixed(2)}`;
     });
   }
 
   function selectAlgo(algo, keepPreset = false) {
     stopAnimation();
     state.algo = algo;
+    state.lastActionNote = '';
     if (els.algoSelect) els.algoSelect.value = algo;
-    state.probePoint = null;
+    hideBreakItBanner();
     const meta = ALGO_META[algo];
     if (meta.type === 'binary' && state.activeLabel > 1) state.activeLabel = 0;
-    if ((meta.type === 'regression' || meta.type === 'unlabeled') && state.mode === 'probe') {
-      state.mode = 'add';
-    }
     const preset = keepPreset ? state.preset : defaultPresetForAlgo(algo);
     renderHeaderInfo();
     renderToolbar();
     loadPreset(preset);
-    renderControls();
-    if (typeof window.renderEducationSection === 'function') {
-      window.renderEducationSection(algo);
-    }
+    renderDataControls();
+    renderModelControls();
+    renderBreakItControls();
+    if (typeof window.renderEducationSection === 'function') window.renderEducationSection(state.algo);
+    renderStudioPathNav(state.algo);
+    const crumb = document.getElementById('studioCrumbAlgo');
+    if (crumb && meta) crumb.textContent = meta.name;
   }
 
   function init() {
@@ -1461,7 +1932,6 @@
     els.seedBadge = $('seedBadge');
     els.shareBtn = $('shareBtn');
     els.algoTitle = $('algoTitle');
-    els.algoBadge = $('algoBadge');
     els.algoIntuition = $('algoIntuition');
     els.whatToNotice = $('whatToNotice');
     els.toolbar = $('toolbar');
@@ -1474,17 +1944,24 @@
     els.duelAlgoStat = $('duelAlgoStat');
     els.canvas = $('mlCanvas');
     els.duelCanvas = $('duelCanvas');
+    els.canvasHintText = $('canvasHintText');
     els.coordReadout = $('coordReadout');
+    els.stepNarration = $('stepNarration');
     els.probeBanner = $('probeBanner');
     els.metricsGrid = $('metricsGrid');
     els.curveCard = $('curveCard');
+    els.curveTitle = $('curveTitle');
     els.curveLegend = $('curveLegend');
     els.curveStage = $('curveStage');
+    els.curveHint = $('curveHint');
     els.internalsCard = $('internalsCard');
     els.internalsTitle = $('internalsTitle');
     els.internalsTabs = $('internalsTabs');
     els.internalsStage = $('internalsStage');
-    els.controlsBox = $('controlsBox');
+    els.dataControlsBox = $('dataControlsBox');
+    els.modelControlsBox = $('modelControlsBox');
+    els.breakItBox = $('breakItBox');
+    els.resetDefaultsBtn = $('resetDefaultsBtn');
     els.dataCount = $('dataCount');
     els.dataTableBody = $('dataTableBody');
     els.inputX = $('inputX');
@@ -1507,7 +1984,7 @@
       state.duelMode = !state.duelMode;
       renderHeaderInfo();
       renderToolbar();
-      renderControls();
+      renderModelControls();
       syncURL();
       recomputeAndRender();
     });
@@ -1517,7 +1994,7 @@
       state.duelAlgo = e.target.value;
       renderHeaderInfo();
       renderToolbar();
-      renderControls();
+      renderModelControls();
       syncURL();
       recomputeAndRender();
     });
@@ -1527,6 +2004,15 @@
       els.seedBadge.textContent = String(state.seed);
       loadPreset(state.preset);
       showToast(`Reseeded with seed ${state.seed}`);
+    });
+
+    els.resetDefaultsBtn.addEventListener('click', () => {
+      stopAnimation();
+      state.params = { ...DEFAULT_PARAMS };
+      state.playbackSpeed = 1;
+      state.lastActionNote = '';
+      selectAlgo(state.algo, false);
+      showToast('Reset parameters and dataset to defaults');
     });
 
     els.shareBtn.addEventListener('click', () => {
@@ -1574,10 +2060,16 @@
       showToast('Exported points to CSV box');
     });
 
-    window.selectAlgo = selectAlgo;
     window.addEventListener('resize', drawAllCanvases);
     selectAlgo(state.algo, window.location.search.includes('preset='));
   }
 
+  window.selectAlgo = selectAlgo;
+  window.addEventListener('mlas:theme-change', () => {
+    if (els.canvas) {
+      drawAllCanvases();
+      renderDynamicChart();
+    }
+  });
   window.addEventListener('DOMContentLoaded', init);
 })();

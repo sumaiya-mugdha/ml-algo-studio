@@ -37,7 +37,6 @@ html, body {
   display: none !important;
 }
 
-/* Focus visibility for keyboard accessibility */
 button:focus-visible,
 select:focus-visible,
 input:focus-visible,
@@ -47,14 +46,14 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-/* Top Navigation Bar */
+/* Compact Single-Line Top Bar */
 .topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 24px;
+  gap: 10px;
+  padding: 10px 24px;
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
@@ -62,19 +61,19 @@ summary:focus-visible {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 }
 
 .brand-mark {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
   background-color: var(--accent);
   color: #ffffff;
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
@@ -83,11 +82,6 @@ summary:focus-visible {
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.01em;
-}
-
-.brand-sub {
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 .topbar-controls {
@@ -167,7 +161,7 @@ summary:focus-visible {
 }
 
 .btn-sm {
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 12px;
 }
 
@@ -178,37 +172,27 @@ summary:focus-visible {
   font-weight: 600;
 }
 
-/* Workspace Layout (Visualization as Hero) */
+/* Workspace Layout */
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 20px;
+  gap: 18px;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 20px 24px;
+  padding: 16px 24px 24px;
   align-items: start;
 }
 
 .stage {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
-/* Intuition Header */
+/* Minimal Stage Header */
 .intuition-bar {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 14px 18px;
-}
-
-.intuition-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  padding: 2px 2px 4px;
 }
 
 .algo-heading {
@@ -218,18 +202,8 @@ summary:focus-visible {
   letter-spacing: -0.02em;
 }
 
-.algo-tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background-color: var(--bg-subtle);
-  color: var(--text-muted);
-  border: 1px solid var(--border-light);
-}
-
 .algo-intuition {
-  margin-top: 6px;
+  margin-top: 3px;
   font-size: 14px;
   color: var(--text-muted);
 }
@@ -239,12 +213,12 @@ summary:focus-visible {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 9px 12px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .toolbar-group {
@@ -252,6 +226,35 @@ summary:focus-visible {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.speed-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.speed-btn {
+  padding: 4px 8px;
+  border: none;
+  border-right: 1px solid var(--border-light);
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.speed-btn:last-child {
+  border-right: none;
+}
+
+.speed-btn.active {
+  background-color: var(--accent);
+  color: #ffffff;
 }
 
 .class-pill {
@@ -325,7 +328,7 @@ summary:focus-visible {
   width: 100%;
   aspect-ratio: 16 / 10;
   min-height: 280px;
-  max-height: 520px;
+  max-height: 500px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -342,6 +345,15 @@ canvas {
   height: 100%;
   display: block;
   cursor: crosshair;
+  touch-action: none;
+}
+
+canvas.dragging {
+  cursor: grabbing;
+}
+
+canvas.can-grab {
+  cursor: grab;
 }
 
 .canvas-footer {
@@ -361,12 +373,29 @@ canvas {
   color: var(--accent);
 }
 
-/* Probe Explanation Banner */
+/* Live Step Narration Bar */
+.narration-bar {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text-main);
+}
+
+.narration-bar.warning {
+  background-color: var(--danger-tint);
+  border-color: #fecaca;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Probe Banner */
 .probe-banner {
   background-color: var(--accent-tint);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
+  padding: 9px 12px;
   font-size: 13px;
   color: var(--text-main);
 }
@@ -374,7 +403,7 @@ canvas {
 /* Metrics */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 10px;
 }
 
@@ -382,7 +411,7 @@ canvas {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 9px 12px;
 }
 
 .metric-label {
@@ -400,7 +429,7 @@ canvas {
   color: var(--text-main);
 }
 
-/* Live Loss Curve & Internals */
+/* Dynamic Analysis Card & Internals */
 .curve-card,
 .internals-card,
 .notice-card,
@@ -418,6 +447,10 @@ canvas {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.compact-row {
+  margin-bottom: 4px;
 }
 
 .section-label {
@@ -449,6 +482,12 @@ canvas {
   margin: 0 auto;
   max-width: 100%;
   height: auto;
+}
+
+.curve-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* What to Notice */
@@ -499,13 +538,36 @@ canvas {
 .controls-rail {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .controls-rail .panel-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+
+.break-it-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.break-btn {
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  border-color: #fecaca;
+  background-color: var(--danger-tint);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.break-btn:hover:not(:disabled) {
+  background-color: #fee2e2;
+  border-color: var(--danger);
 }
 
 .control-row {
@@ -664,7 +726,7 @@ textarea {
 
 @media (max-width: 640px) {
   .topbar {
-    padding: 12px 14px;
+    padding: 10px 14px;
   }
   .inline-field select {
     min-width: 140px;
